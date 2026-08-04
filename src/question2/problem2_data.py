@@ -24,15 +24,9 @@ problem2_data.py — 问题二：数据预处理与供需分析
 
 import pandas as pd
 import numpy as np
-import os, sys
+import os
 import warnings
 warnings.filterwarnings('ignore')
-
-# 项目根目录 (problem2_data.py 在 src/question2/ 下，向上3级)
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, ROOT)
-OUTPUT_DIR = os.path.join(ROOT, 'result', 'tables')
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # =============================================================================
 # 0. 创建输出目录
@@ -47,19 +41,19 @@ print('步骤1: 加载原始数据')
 print('=' * 60)
 
 # 附件1：区域基础数据（取前10行有效数据，跳过汇总行）
-df_annex1 = pd.read_excel(os.path.join(ROOT, 'data/raw/附件 1 市主城区 10 个典型区域基础数据.xlsx'), nrows=10)
+df_annex1 = pd.read_excel('附件 1 市主城区 10 个典型区域基础数据.xlsx', nrows=10)
 print(f'附件1: {df_annex1.shape[0]} 个区域, {df_annex1.shape[1]} 个字段')
 
 # 附件4：24小时电网最大允许负荷
-df_annex4 = pd.read_excel(os.path.join(ROOT, 'data/raw/附件4 市主城区 10 个区域分时段电网最大允许负荷数据.xlsx'))
+df_annex4 = pd.read_excel('附件4 市主城区 10 个区域分时段电网最大允许负荷数据.xlsx')
 print(f'附件4: {df_annex4.shape[0]} 个区域, {df_annex4.shape[1]} 列(含区域名+24h)')
 
 # 问题1输出：日均预测结果
-df_pred_daily = pd.read_excel(os.path.join(ROOT, 'result/prediction_result.xlsx'))
+df_pred_daily = pd.read_excel('prediction_result.xlsx')
 print(f'prediction_result: {df_pred_daily.shape[0]} 个区域')
 
 # 问题1输出：分时预测结果 (480行 = 10区域 × 24h × 2日期类型)
-df_pred_hourly = pd.read_excel(os.path.join(ROOT, 'result/tables/hourly_prediction.xlsx'))
+df_pred_hourly = pd.read_excel('hourly_prediction.xlsx')
 print(f'hourly_prediction: {df_pred_hourly.shape[0]} 条记录')
 
 # =============================================================================
@@ -376,7 +370,7 @@ df_table1['缺口率(%)'] = df_table1['缺口率(%)'] * 100
 df_table1['电网负载率(%)'] = df_table1['电网负载率(%)'] * 100
 df_table1['当前覆盖率(%)'] = df_table1['当前覆盖率(%)'] * 100
 
-output_path1 = os.path.join(OUTPUT_DIR, '表1_各区域供需缺口与建设紧迫度.xlsx')
+output_path1 = 'output/表1_各区域供需缺口与建设紧迫度.xlsx'
 df_table1.to_excel(output_path1, index=False)
 print(f'表1 已保存: {output_path1}')
 
@@ -386,7 +380,7 @@ df_spillover = pd.DataFrame(
     index=[f'区域{i+1}' for i in range(n_regions)],
     columns=[f'区域{j+1}' for j in range(n_regions)]
 )
-output_path2 = os.path.join(OUTPUT_DIR, '空间溢出权重矩阵.xlsx')
+output_path2 = 'output/空间溢出权重矩阵.xlsx'
 df_spillover.to_excel(output_path2)
 print(f'空间溢出矩阵已保存: {output_path2}')
 
@@ -396,12 +390,12 @@ df_dist = pd.DataFrame(
     index=[f'区域{i+1}' for i in range(n_regions)],
     columns=[f'区域{j+1}' for j in range(n_regions)]
 )
-output_path3 = os.path.join(OUTPUT_DIR, '区域距离矩阵.xlsx')
+output_path3 = 'output/区域距离矩阵.xlsx'
 df_dist.to_excel(output_path3)
 print(f'距离矩阵已保存: {output_path3}')
 
 # 保存核心数据供后续步骤使用
-np.savez(os.path.join(OUTPUT_DIR, 'preprocess_data.npz'),
+np.savez('output/preprocess_data.npz',
          spillover_matrix=spillover_matrix,
          dist_matrix=dist_matrix,
          service_radii=service_radii,

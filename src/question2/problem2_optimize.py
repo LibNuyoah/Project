@@ -25,26 +25,21 @@ problem2_optimize.py — 问题二：基于NSGA-II的多目标充电桩布局优
 
 import numpy as np
 import pandas as pd
-import os, sys
+import os
 import warnings
 warnings.filterwarnings('ignore')
-
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, ROOT)
-OUTPUT_DIR = os.path.join(ROOT, 'result', 'tables')
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 print('=' * 60)
 print('问题二 NSGA-II 多目标优化求解（修正地理覆盖率模型）')
 print('=' * 60)
 
 # 加载预处理数据
-data = np.load(os.path.join(OUTPUT_DIR, 'preprocess_data.npz'), allow_pickle=True)
+data = np.load('output/preprocess_data.npz', allow_pickle=True)
 spillover_matrix = data['spillover_matrix']
 dist_matrix = data['dist_matrix']
 service_radii = data['service_radii']
 
-df_gap = pd.read_excel(os.path.join(OUTPUT_DIR, '表1_各区域供需缺口与建设紧迫度.xlsx'))
+df_gap = pd.read_excel('output/表1_各区域供需缺口与建设紧迫度.xlsx')
 
 # =============================================================================
 # 1. 全局参数
@@ -141,7 +136,8 @@ def compute_coverage(delta_fast, delta_slow):
     pop_size = delta_fast.shape[0]
     new_coverage = np.zeros((pop_size, N_REGIONS))
 
-    delta_total = delta_fast + delta_slow  # 新增总桩数
+    # 快充覆盖权重=慢充×2（服务效率4倍×地理折扣0.5，避免只建慢充）
+    delta_total = 2.0 * delta_fast + 1.0 * delta_slow
 
     for i in range(N_REGIONS):
         # 边际覆盖递减：已有覆盖越高，新增覆盖越少
@@ -165,6 +161,17 @@ def compute_coverage(delta_fast, delta_slow):
         new_coverage[:, i] = np.minimum(new_covered / total_area[i], 1.0)
 
     return new_coverage
+
+def compute_coverage_standalone(delta_fast, delta_slow):
+    pop_size = delta_fast.shape[0]
+    cov = np.zeros((pop_size, N_REGIONS))
+    delta_total = 2.0 * delta_fast + 1.0 * delta_slow
+    for i in range(N_REGIONS):
+        marginal = SINGLE_COVERAGE_AREA[i] * ((1.0 - current_coverage[i]) ** 1.2)
+        added = delta_total[:, i] * marginal
+        cv = np.minimum((covered_area[i] + added) / total_area[i], 1.0)
+        cov[:, i] = cv
+    return cov
 
 
 def compute_service_capacity(delta_fast, delta_slow):
@@ -229,9 +236,10 @@ def check_constraints(delta_fast, delta_slow):
     feasible = np.ones(pop_size, dtype=bool)
 
     # 约束1: 各区域地理覆盖率 ≥ 90%（考虑鲁棒需求）
-    cov = compute_coverage(delta_fast, delta_slow)
+    # 约束1改用独立覆盖率（不含溢出），每个区域必须独立达标
+    cov_standalone = compute_coverage_standalone(delta_fast, delta_slow)
     for i in range(N_REGIONS):
-        feasible = feasible & (cov[:, i] >= COVERAGE_MIN)
+        feasible = feasible & (cov_standalone[:, i] >= COVERAGE_MIN)
 
     # 约束2: 服务能力 ≥ 预测车次（鲁棒上界）
     capacity = compute_service_capacity(delta_fast, delta_slow)
@@ -505,10 +513,10 @@ for k in range(len(pareto_indices)):
         rec[f'区域{i+1}_新增慢充'] = int(pareto_slow[k, i])
     pareto_records.append(rec)
 
-pd.DataFrame(pareto_records).to_excel(os.path.join(OUTPUT_DIR, 'Pareto前沿解集.xlsx'), index=False)
-pd.DataFrame(convergence_history).to_excel(os.path.join(OUTPUT_DIR, 'NSGA-II收敛曲线数据.xlsx'), index=False)
+pd.DataFrame(pareto_records).to_excel('output/Pareto前沿解集.xlsx', index=False)
+pd.DataFrame(convergence_history).to_excel('output/NSGA-II收敛曲线数据.xlsx', index=False)
 
-np.savez(os.path.join(OUTPUT_DIR, 'optimization_result.npz'),
+np.savez('output/optimization_result.npz',
          pareto_pop=pareto_pop, pareto_obj1=pareto_obj1,
          pareto_obj2=pareto_obj2, pareto_obj3=pareto_obj3,
          pareto_fast=pareto_fast, pareto_slow=pareto_slow,
