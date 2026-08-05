@@ -30,7 +30,7 @@
      │        输出: 调度前后负荷曲线、峰谷差降低率
      │
      └── 问题4: 多情景需求推演 → 有效容量修正(Q3融合) → 健康度评价 → 扩容触发 → 三年扩展方案
-     │        输出: 5张图表 + 动态扩容方案
+              输出: 5张图表 + 动态扩容方案
 ```
 
 ---
@@ -44,13 +44,14 @@ pip install -r requirements.txt
 # 2. 检查数据完整性
 python utils/check_data.py
 
-# 3. 运行全流程（约30-60分钟）
+# 3. 运行全流程
 python run_all.py
 
-# 或按问题单独运行（Q2需在 src/question2/ 目录下运行）
-cd src/question1 && python main.py         # 问题1
-cd src/question2 && python problem2_result.py  # 问题2
-cd src/question3 && python problem3_result.py  # 问题3
+# 或按问题单独运行
+python src/problem1/main.py                         # 问题1
+python src/problem2/problem2_result.py              # 问题2
+python src/problem3/problem3_result.py              # 问题3
+python src/problem4/problem4_main.py                # 问题4
 ```
 
 ---
@@ -75,13 +76,15 @@ data/raw/
 附件2和附件3各为一个Excel文件，包含**工作日**和**周末**两个sheet：
 
 ```python
+from utils.paths import FILE_ATTACHMENT2, FILE_ATTACHMENT3
+
 # 附件2：充电车次
 df_wd = pd.read_excel(FILE_ATTACHMENT2, sheet_name='工作日分时段充电车次数据')
 df_we = pd.read_excel(FILE_ATTACHMENT2, sheet_name='周末充电车次数据')
 
 # 附件3：充电负荷
 df_wd = pd.read_excel(FILE_ATTACHMENT3, sheet_name='工作日分时段充电负荷数据')
-df_we = pd.read_excel(FILE_ATTACHMENT3, sheet_name='周末充电负荷数据')
+df_we = pd.read_excel(FILE_ATTACHMENT3, sheet_name='周末充电负荷数据（修改后）')
 ```
 
 ---
@@ -90,212 +93,102 @@ df_we = pd.read_excel(FILE_ATTACHMENT3, sheet_name='周末充电负荷数据')
 
 ```
 project/
-├── README.md
-├── requirements.txt
-├── run_all.py                         # 统一运行入口
+├── README.md                             # 项目说明
+├── requirements.txt                      # Python依赖
+├── run_all.py                            # 统一运行入口（全流程）
 │
-├── data/
-│   ├── raw/                           # 官方原始附件（5个文件，不可改名）
-│   └── processed/                     # 清洗后数据（程序生成）
-│       └── clean_data.xlsx
+├── data/                                 # 数据目录
+│   ├── raw/                              # 原始附件数据（5个文件，不可改名）
+│   │   ├── 附件 1 ...xlsx               # 区域基础数据
+│   │   ├── 附件2 ...xlsx                # 分时段充电车次
+│   │   ├── 附件3 ...xlsx                # 分时段充电负荷
+│   │   ├── 附件4 ...xlsx                # 电网最大允许负荷
+│   │   └── 附件5 ...docx                # 基础参数补充
+│   └── processed/                        # 数据预处理结果（程序生成）
+│       └── clean_data.xlsx              # 清洗后的合并数据
 │
-├── src/
-│   ├── question1/                     # 问题1：充电需求分析与预测
-│   │   ├── main.py                    # Q1 主入口（预测汇总输出）
+├── models/                               # 模型文件
+│   └── xgboost_model.pkl                # 训练好的XGBoost模型
+│
+├── results/                              # 输出结果目录
+│   ├── figures/                          # 图片（.png）
+│   ├── tables/                           # 表格（.xlsx）
+│   ├── logs/                             # 日志
+│   ├── q3_output/                        # 问题3中间数据与图表
+│   ├── q4_output/                        # 问题4输出图表
+│   └── prediction_result.xlsx           # 问题1最终预测结果
+│
+├── src/                                  # 源代码
+│   ├── problem1/                         # 问题1：充电需求分析与预测
+│   │   ├── main.py                       # Q1主入口（预测汇总输出）
 │   │   ├── preprocess/
-│   │   │   └── data_clean.py          # 数据读取、清洗、格式转换
+│   │   │   └── data_clean.py             # 数据读取、清洗、格式转换
 │   │   ├── analysis/
-│   │   │   ├── spatial_analysis.py    # 空间维度分析 + 单桩利用率
-│   │   │   ├── temporal_analysis.py   # 时间维度 + 工作日/周末差异
-│   │   │   ├── correlation_analysis.py # Pearson相关 + 热力图
-│   │   │   ├── cluster_analysis.py    # K-means区域功能聚类
-│   │   │   └── region_type_loader.py  # 聚类结果加载器
+│   │   │   ├── spatial_analysis.py       # 空间维度分析 + 单桩利用率
+│   │   │   ├── temporal_analysis.py      # 时间维度 + 工作日/周末差异
+│   │   │   ├── correlation_analysis.py   # Pearson相关 + 热力图
+│   │   │   ├── cluster_analysis.py       # K-means区域功能聚类
+│   │   │   └── region_type_loader.py     # 聚类结果加载器
 │   │   └── model/
-│   │       ├── xgboost_model.py       # XGBoost 预测（含超参调优）
-│   │       └── shap_analysis.py       # SHAP 模型解释
+│   │       ├── xgboost_model.py          # XGBoost预测（含超参调优）
+│   │       └── shap_analysis.py          # SHAP模型解释
 │   │
-│   ├── question2/                     # 问题2：充电桩优化配置
-│   │   ├── problem2_data.py           # 供需缺口 + 空间溢出矩阵
-│   │   ├── problem2_optimize.py       # NSGA-II 多目标优化求解
-│   │   └── problem2_result.py         # TOPSIS决策 + 可视化
+│   ├── problem2/                         # 问题2：充电桩优化配置
+│   │   ├── problem2_data.py              # 供需缺口 + 空间溢出矩阵
+│   │   ├── problem2_optimize.py          # NSGA-II多目标优化求解
+│   │   └── problem2_result.py            # TOPSIS决策 + 可视化
 │   │
-│   ├── question3/                     # 问题3：分时电价调度
-│   │   ├── problem3_data.py           # 调度前峰谷差分析
-│   │   ├── problem3_solve.py          # 负荷转移（均匀/填谷两方案）
-│   │   └── problem3_result.py         # 效果评估 + 可视化
+│   ├── problem3/                         # 问题3：分时电价调度
+│   │   ├── problem3_data.py              # 调度前峰谷差分析
+│   │   ├── problem3_solve.py             # 负荷转移（均匀/填谷两方案）
+│   │   └── problem3_result.py            # 效果评估 + 可视化
 │   │
-│   └── question4/                     # 问题4：生命周期动态扩展规划
-│       ├── problem4_main.py            # 多情景推演 + 健康度 + 扩容（一站式）
-│       └── problem4_output/            # 输出图表（5张图 + 9张表）
+│   └── problem4/                         # 问题4：生命周期动态扩展规划
+│       └── problem4_main.py              # 多情景推演 + 健康度 + 扩容
 │
-├── model/                             # 训练好的模型文件
-│   └── xgboost_model.pkl
+├── utils/                                # 公共工具
+│   ├── __init__.py                       # 包初始化
+│   ├── paths.py                          # 统一路径管理（所有代码引用路径的唯一入口）
+│   └── check_data.py                     # 数据完整性检查
 │
-├── result/
-│   ├── figures/                       # 所有图表（.png）
-│   ├── tables/                        # 所有表格（.xlsx）
-│   ├── q3_output/                     # 问题3中间数据
-│   └── prediction_result.xlsx         # Q1 最终预测
-│
-├── docs/                              # 论文与参考资料
-│   ├── 2026_B题.docx
-│   ├── B题论文_v8.docx                # 最新论文（v8：修复问题二4个已知问题）
-│   ├── B题论文_v7.docx                # 队友上传原版
-│   ├── 工作日志.md                     # 小组工作日志
-│   ├── run_all修复说明.md              # run_all.py 修复记录
-│   ├── backup/                        # 修复前后代码备份
-│   │   ├── original/
-│   │   ├── modified/
-│   │   └── changes.diff
-│   ├── problem2框架.md
-│   └── 问题3框架.md
-│
-└── utils/                             # 公共工具
-    ├── __init__.py
-    ├── paths.py                       # 统一路径管理
-    └── check_data.py                  # 数据完整性检查
+└── docs/                                 # 论文与参考资料
+    ├── 2026_B题.docx                     # 赛题原文
+    ├── B题论文_v10.docx                  # 最新论文
+    ├── B题论文_v6~v9.docx                # 历史论文版本
+    ├── problem2框架.md                   # 问题2模型框架
+    ├── problem2最终论文.docx             # 问题2定稿
+    ├── 问题3框架.md                      # 问题3模型框架
+    ├── run_all修复说明.md                # 运行修复记录
+    └── 工作日志.md                        # 小组工作日志
 ```
 
 ---
 
-## 问题1：充电需求分析与预测
+## 运行顺序
 
-### 流程
-
-```
-附件1-3 → 数据清洗(宽表→长表) → EDA三维分析 → 影响因素Pearson相关
-→ K-means聚类 → XGBoost预测(33维特征,GridSearchCV调优) → SHAP解释 → 预测输出
-```
-
-### 模型性能（测试集）
-
-| 指标 | 数值 |
-|:---|:---:|
-| R² | 0.8341 |
-| MAE | 121.1 kWh |
-| RMSE | 208.5 kWh |
-| ±20%准确率 | 56.2% |
-| RPD | 2.47 |
-
-### 主要发现
-
-- 充电需求空间差异达2.4倍（枣园街道 vs 柳林镇）
-- 工作日峰谷比约79:1，晚高峰17-18时为峰值
-- 区域聚类(K=3)：老城核心区 / 城市新区 / 城郊·工业区
-- SHAP TOP3因素：人口密度、是否工作日、车流量
-
----
-
-## 问题2：充电桩多目标优化配置
-
-### 模型
-
-- **决策变量**：10区域 × (快充增量 + 慢充增量) = 20维
-- **目标**：min 成本 / max 覆盖率 / min 负荷不均衡度
-- **算法**：NSGA-II（种群100，500代）
-- **决策**：熵权-TOPSIS 从 Pareto 前沿选取最优折衷方案
-- **创新**：快慢充差异化覆盖权重 + 独立覆盖率约束 + 覆盖率边际递减TOPSIS
-
-### 关键结果（方案#56）
-
-| 指标 | 优化前 | 优化后 |
-|:---|:---:|:---:|
-| 覆盖率<90%区域 | 10/10 | 0/10 |
-| 平均地理覆盖率 | 54.6% | 98.2% |
-| 电网过载风险区域 | 1 | 1 |
-| 新增快充桩 | — | 6台 |
-| 新增慢充桩 | — | 48台 |
-| 总投资 | — | 74.4万元 |
-
-- Pareto前沿：成本 54~1628万元
-- 快充部署：凤凰山2台、新城2台、姚店1台、李渠1台
-
----
-
-## 问题3：分时电价调度与峰谷差优化
-
-### 模型
-
-- **分时电价**：高峰1.19 / 平段0.70 / 低谷0.21 元/kWh
-- **调度策略**：高峰时段20%负荷转移至低谷
-- **两种方案**：均匀分配 vs 填谷优先
-
-### 关键结果
-
-| 指标 | 工作日 | 周末 |
-|:---|:---:|:---:|
-| 调度前峰谷差 | 14,057 kW | 11,896 kW |
-| 峰谷差降低率 | 30.8% | 16.0% |
-| 过载消除 | 全部消除 | 全部消除 |
-
----
-
-## 问题4：基于需求预测、布局优化与负荷调度协同的充电网络生命周期动态扩展模型
-
-### 核心定位
-
-- **问题2**：初始建设"在哪里建"（一次最优布局）
-- **问题3**：已有设施的负荷调度优化（如何运行）
-- **问题4**：未来"何时扩建、扩多少"（动态扩展规划）
-- **不重新运行NSGA-II**，基于问题2初始布局做增量扩展
-
-### 模型架构
+各问题之间存在数据依赖关系，必须按顺序运行：
 
 ```
-问题1需求预测 → 问题2初始布局 → 问题3调度削峰
-                                    ↓
-                            有效容量修正 C_eff = C_raw/(1-ηα)
-                                    ↓
-                            多情景需求推演 (10%/15%/20%)
-                                    ↓
-                            四维健康度评价 (熵权法赋权)
-                                    ↓
-                           ┌ 动态反馈闭环 ┐
-                           │ 健康度评价    │
-                           │ ↓            │
-                           │ 扩容触发 E(t) │
-                           │ ↓            │
-                           │ 容量更新 C(t+1)│
-                           └──────────────┘
-                                    ↓
-                            三年扩展方案 + 扩容优先级
+1. utils/check_data.py                      # 数据完整性检查（必须先运行）
+       ↓
+2. src/problem1/preprocess/data_clean.py    # 数据清洗
+3. src/problem1/analysis/cluster_analysis.py  # 区域聚类
+4. src/problem1/model/xgboost_model.py      # XGBoost训练
+5. src/problem1/model/shap_analysis.py      # SHAP解释
+6. src/problem1/main.py                     # 预测汇总输出
+       ↓
+7. src/problem2/problem2_data.py            # 供需分析（依赖Q1预测结果）
+8. src/problem2/problem2_optimize.py        # NSGA-II优化
+9. src/problem2/problem2_result.py          # 结果可视化
+       ↓
+10. src/problem3/problem3_data.py           # 调度前分析（依赖附件3）
+11. src/problem3/problem3_solve.py          # 负荷转移
+12. src/problem3/problem3_result.py         # 效果评估
+       ↓
+13. src/problem4/problem4_main.py            # 动态扩展规划（依赖Q1-Q3）
 ```
 
-### 关键创新
-
-- **调度收益驱动的有效容量模型**：将Q3削峰效果转化为设施承载能力提升（~14.9%），延缓扩容需求
-- **健康度驱动的动态反馈机制**：S(t)={D(t),C(t),H(t)} → E(t)触发 → C(t+1)=C(t)+ΔC(t)
-- **多情景分析**：10%/15%/20%三情景覆盖±5%增长波动
-
-### 关键结果
-
-| 情景 | 扩容次数 | 快充 | 成本 |
-|:---|:---:|:---:|:---:|
-| 低增长(10%) | 1次(2028) | 1台 | 6万 |
-| 基准增长(15%) | 2次(2028) | 4台 | 24万 |
-| 高增长(20%) | 5次(2027-28) | 13台 | 78万 |
-
-- 基准增长下扩容优先级TOP3：南市街道 > 新城街道 > 姚店镇
-- 调度后所有区域有效容量提升约14.9%
-
-### 输出文件
-
-| 文件 | 内容 |
-|:---|:---|
-| `problem4_output/图1_多情景需求增长曲线.png` | 图20 全市+各区域需求增长 |
-| `problem4_output/图2_健康度热力图.png` | 图21 三情景逐年健康度 |
-| `problem4_output/图3_调度有效容量对比.png` | 图22 调度前后容量对比 |
-| `problem4_output/图4_扩容优先级排序.png` | 图23 基准增长优先级 |
-| `problem4_output/图5_三年动态扩容方案.png` | 图24 扩容投资与构成 |
-| `problem4_output/problem4_final_result.xlsx` | 6 sheet综合输出 |
-
----
-
-## 环境依赖
-
-- Python 3.9+
-- pandas, numpy, scikit-learn, xgboost, matplotlib, seaborn, shap, scipy, openpyxl
-- 详见 `requirements.txt`
+或直接运行 `python run_all.py` 一键完成全部流程。
 
 ---
 
@@ -304,5 +197,25 @@ project/
 所有Python文件通过 `utils/paths.py` 统一管理项目路径：
 
 ```python
-from utils.paths import DATA_RAW, FILE_CLEAN_DATA, RESULT_FIGURES
+from utils.paths import (
+    DATA_RAW,           # 原始数据目录
+    DATA_PROCESSED,     # 处理后的数据目录
+    RESULTS_DIR,        # 结果根目录
+    RESULTS_FIGURES,    # 图片目录
+    RESULTS_TABLES,     # 表格目录
+    FILE_ATTACHMENT1,   # 附件1路径
+    FILE_CLEAN_DATA,    # 清洗数据路径
+    FILE_PREDICTION_RESULT,  # 预测结果路径
+    ...
+)
 ```
+
+**禁止在任何代码中硬编码文件路径。** 所有路径必须通过 `utils/paths` 获取。
+
+---
+
+## 环境依赖
+
+- Python 3.9+
+- pandas, numpy, scikit-learn, xgboost, matplotlib, seaborn, shap, scipy, openpyxl
+- 详见 `requirements.txt`

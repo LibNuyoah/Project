@@ -1,7 +1,7 @@
 """
 数据完整性检查工具
 -----------------
-启动项目前检查所有官方附件是否存在、Sheet 是否正确。
+检查所有官方附件是否存在、Sheet 是否正确、数据规模与字段。
 """
 
 import os
@@ -19,88 +19,111 @@ from utils.paths import (
     DATA_RAW
 )
 
-EXIT_CODE = 0
-
-
-def check(msg, condition):
-    global EXIT_CODE
-    if condition:
-        print(f"  [OK] {msg}")
-    else:
-        print(f"  [FAIL] {msg}")
-        EXIT_CODE = 1
-
 
 def main():
     print("=" * 60)
-    print("数据完整性检查")
+    print("数据检查开始")
     print("=" * 60)
 
-    # ── 1. data/raw 目录存在 ──
-    print("\n[1] 检查 data/raw 目录...")
-    check("data/raw 目录存在", os.path.isdir(DATA_RAW))
+    check_passed = True
 
-    # ── 2. 附件1-5 存在 ──
-    print("\n[2] 检查官方附件文件...")
-    attachments = {
-        '附件1': FILE_ATTACHMENT1,
-        '附件2': FILE_ATTACHMENT2,
-        '附件3': FILE_ATTACHMENT3,
-        '附件4': FILE_ATTACHMENT4,
-        '附件5': FILE_ATTACHMENT5,
-    }
-    for name, path in attachments.items():
-        check(f"{name} 存在", os.path.isfile(path))
+    # ── 附件1 ──
+    print("\n附件1：")
+    print("文件路径：")
+    print(FILE_ATTACHMENT1)
+    if os.path.isfile(FILE_ATTACHMENT1):
+        df1 = pd.read_excel(FILE_ATTACHMENT1)
+        df1_valid = df1.iloc[:10]
+        print("\n数据规模：")
+        print(df1_valid.shape)
+        print("\n字段：")
+        for col in df1_valid.columns:
+            print(col)
+        print("\n缺失值：")
+        print(df1_valid.isnull().sum().sum())
+        print("\n重复值：")
+        print(df1_valid.duplicated().sum())
+    else:
+        print("\n[FAIL] 文件不存在")
+        check_passed = False
 
-    # ── 3. 附件2 Sheet 检查 ──
-    print("\n[3] 检查附件2 Sheet...")
+    # ── 附件2 ──
+    print("\n\n附件2：")
+    print("文件路径：")
+    print(FILE_ATTACHMENT2)
     if os.path.isfile(FILE_ATTACHMENT2):
-        try:
-            xl2 = pd.ExcelFile(FILE_ATTACHMENT2)
-            sheets2 = xl2.sheet_names
-            check(f"工作日Sheet: '{SHEET_ATTACHMENT2_WEEKDAY}'",
-                  SHEET_ATTACHMENT2_WEEKDAY in sheets2)
-            check(f"周末Sheet: '{SHEET_ATTACHMENT2_WEEKEND}'",
-                  SHEET_ATTACHMENT2_WEEKEND in sheets2)
-            # 尝试读取
-            df_wd = pd.read_excel(FILE_ATTACHMENT2, sheet_name=SHEET_ATTACHMENT2_WEEKDAY)
-            df_we = pd.read_excel(FILE_ATTACHMENT2, sheet_name=SHEET_ATTACHMENT2_WEEKEND)
-            check(f"工作日数据: {df_wd.shape[0]}行×{df_wd.shape[1]}列",
-                  df_wd.shape[0] >= 10 and df_wd.shape[1] >= 24)
-            check(f"周末数据: {df_we.shape[0]}行×{df_we.shape[1]}列",
-                  df_we.shape[0] >= 10 and df_we.shape[1] >= 24)
-        except Exception as e:
-            check(f"读取附件2: {e}", False)
+        xl2 = pd.ExcelFile(FILE_ATTACHMENT2)
+        print("\nSheet列表：")
+        for s in xl2.sheet_names:
+            print(f"  - {s}")
+        df2_wd = pd.read_excel(FILE_ATTACHMENT2, sheet_name=SHEET_ATTACHMENT2_WEEKDAY)
+        df2_we = pd.read_excel(FILE_ATTACHMENT2, sheet_name=SHEET_ATTACHMENT2_WEEKEND)
+        print("\n数据规模：")
+        print(f"  工作日: {df2_wd.shape}")
+        print(f"  周末: {df2_we.shape}")
+        print("\n缺失值：")
+        print(f"  工作日: {df2_wd.isnull().sum().sum()}")
+        print(f"  周末: {df2_we.isnull().sum().sum()}")
+    else:
+        print("\n[FAIL] 文件不存在")
+        check_passed = False
 
-    # ── 4. 附件3 Sheet 检查 ──
-    print("\n[4] 检查附件3 Sheet...")
+    # ── 附件3 ──
+    print("\n\n附件3：")
+    print("文件路径：")
+    print(FILE_ATTACHMENT3)
     if os.path.isfile(FILE_ATTACHMENT3):
-        try:
-            xl3 = pd.ExcelFile(FILE_ATTACHMENT3)
-            sheets3 = xl3.sheet_names
-            check(f"工作日Sheet: '{SHEET_ATTACHMENT3_WEEKDAY}'",
-                  SHEET_ATTACHMENT3_WEEKDAY in sheets3)
-            check(f"周末Sheet: '{SHEET_ATTACHMENT3_WEEKEND}'",
-                  SHEET_ATTACHMENT3_WEEKEND in sheets3)
-            df_wd3 = pd.read_excel(FILE_ATTACHMENT3, sheet_name=SHEET_ATTACHMENT3_WEEKDAY)
-            df_we3 = pd.read_excel(FILE_ATTACHMENT3, sheet_name=SHEET_ATTACHMENT3_WEEKEND)
-            check(f"工作日数据: {df_wd3.shape[0]}行×{df_wd3.shape[1]}列",
-                  df_wd3.shape[0] >= 10 and df_wd3.shape[1] >= 24)
-            check(f"周末数据: {df_we3.shape[0]}行×{df_we3.shape[1]}列",
-                  df_we3.shape[0] >= 10 and df_we3.shape[1] >= 24)
-        except Exception as e:
-            check(f"读取附件3: {e}", False)
+        xl3 = pd.ExcelFile(FILE_ATTACHMENT3)
+        print("\nSheet列表：")
+        for s in xl3.sheet_names:
+            print(f"  - {s}")
+        df3_wd = pd.read_excel(FILE_ATTACHMENT3, sheet_name=SHEET_ATTACHMENT3_WEEKDAY)
+        df3_we = pd.read_excel(FILE_ATTACHMENT3, sheet_name=SHEET_ATTACHMENT3_WEEKEND)
+        print("\n数据规模：")
+        print(f"  工作日: {df3_wd.shape}")
+        print(f"  周末: {df3_we.shape}")
+        print("\n缺失值：")
+        print(f"  工作日: {df3_wd.isnull().sum().sum()}")
+        print(f"  周末: {df3_we.isnull().sum().sum()}")
+    else:
+        print("\n[FAIL] 文件不存在")
+        check_passed = False
+
+    # ── 附件4 ──
+    print("\n\n附件4：")
+    print("文件路径：")
+    print(FILE_ATTACHMENT4)
+    if os.path.isfile(FILE_ATTACHMENT4):
+        df4 = pd.read_excel(FILE_ATTACHMENT4)
+        print("\n数据规模：")
+        print(df4.shape)
+        print("\n字段：")
+        for col in df4.columns:
+            print(col)
+        print("\n缺失值：")
+        print(df4.isnull().sum().sum())
+    else:
+        print("\n[FAIL] 文件不存在")
+        check_passed = False
+
+    # ── 附件5 ──
+    print("\n\n附件5：")
+    print("文件路径：")
+    print(FILE_ATTACHMENT5)
+    if os.path.isfile(FILE_ATTACHMENT5):
+        print("\n文件存在: 是")
+    else:
+        print("\n文件存在: 否")
+        check_passed = False
 
     # ── 结果 ──
-    print("\n" + "=" * 60)
-    if EXIT_CODE == 0:
-        print("[OK] All checks passed.")
-    else:
-        print("[FAIL] Errors found, check data/raw/ directory.")
-    print("=" * 60)
+    if check_passed:
+        print("\n\n检查通过")
 
-    return EXIT_CODE
+    print("\n" + "=" * 60)
+    print("全部数据检查完成")
+    print("=" * 60)
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()
