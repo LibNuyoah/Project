@@ -25,11 +25,16 @@ sys.path.insert(0, ROOT)
 from utils.paths import (
     RESULTS_DIR, RESULTS_FIGURES, RESULTS_TABLES, MODELS_DIR,
     FILE_CLEAN_DATA, FILE_PREDICTION_RESULT, FILE_HOURLY_PREDICTION,
-    FILE_MODEL_COMPARISON, FILE_XGBOOST_METRICS, FILE_XGBOOST_MODEL
+    FILE_MODEL_COMPARISON, FILE_XGBOOST_METRICS, FILE_XGBOOST_MODEL,
+    FILE_CLUSTER_RESULT
 )
 from src.problem1.analysis.region_type_loader import get_region_types, get_region_names
 REGION_NAMES = get_region_names()
 REGION_TYPES = get_region_types()
+
+# 聚类One-Hot列名（与xgboost_model.py中add_cluster_features保持一致）
+# 必须与xgboost_model.py中pd.get_dummies排序后的列序一致（中文Unicode序）
+CLUSTER_TYPES_ORDER = ['城市新区', '城郊/工业区', '老城核心区']
 
 
 def load_model():
@@ -37,6 +42,46 @@ def load_model():
     with open(FILE_XGBOOST_MODEL, 'rb') as f:
         model = pickle.load(f)
     return model
+
+
+def get_cluster_type(region_id):
+    """获取指定区域的聚类类型（从cluster_result.xlsx读取）"""
+    cluster_df = pd.read_excel(FILE_CLUSTER_RESULT)
+    mapping = dict(zip(cluster_df['区域编号'], cluster_df['功能特征']))
+    return mapping.get(region_id, '城市新区')
+
+
+def build_feature_vector(region_row, hour, day_type):
+    """
+    构建与训练时一致的特征向量（优化版：38维）。
+
+    特征顺序（与xgboost_model.py的prepare_features输出一致）：
+      连续特征(8) + 是否工作日(1) + 小时One-Hot(24)
+      + 区域类型One-Hot(3) + Load_lag_1(1) + Load_lag_24(1)
+    """
+    # ── 连续特征（8维，已剔除充电覆盖面积）──
+    continuous = [
+        region_row['人口密度'], region_row['车流量'], region_row['商业POI数'],
+        region_row['充电桩数量'], region_row['快充数量'], region_row['慢充数量'],
+        region_row['电网容量'], region_row['区域总面积']
+    ]
+
+    # ── 日期类型（1维）──
+    is_weekday = 1 if day_type == '工作日' else 0
+
+    # ── 小时One-Hot（24维）──
+    hour_oh = [0] * 24
+    hour_oh[hour] = 1
+
+    # ── 区域聚类One-Hot（3维）──
+    region_type = get_cluster_type(int(region_row['区域编号']))
+    cluster_oh = [1 if region_type == ct else 0 for ct in CLUSTER_TYPES]
+
+    # ── 滞后特征（2维）：预测时使用0填充（未来需求无实际滞后值）──
+    lag_features = [0.0, 0.0]
+
+    features = np.array([continuous + [is_weekday] + hour_oh + cluster_oh + lag_features])
+    return features
 
 
 def predict_daily_demand(model):
@@ -100,16 +145,33 @@ def predict_daily_demand(model):
 
 
 def build_feature_vector(region_row, hour, day_type):
-    """构建与训练时一致的特征向量（已剔除充电覆盖面积，共33维）"""
+    """
+    构建与训练时一致的特征向量（优化版：38维）。
+
+    特征顺序（与xgboost_model.py的prepare_features输出一致）：
+      连续特征(8) + 是否工作日(1) + 小时One-Hot(24)
+      + 区域类型One-Hot(3) + Load_lag_1(1) + Load_lag_24(1)
+
+    注：预测时滞后特征用0填充（未来需求无实际滞后值可用）。
+    """
+    # 连续特征（8维，已剔除充电覆盖面积）
     continuous = [
         region_row['人口密度'], region_row['车流量'], region_row['商业POI数'],
         region_row['充电桩数量'], region_row['快充数量'], region_row['慢充数量'],
         region_row['电网容量'], region_row['区域总面积']
     ]
+    # 日期类型（1维）
     is_weekday = 1 if day_type == '工作日' else 0
+    # 小时One-Hot（24维）
     hour_oh = [0] * 24
     hour_oh[hour] = 1
-    features = np.array([continuous + [is_weekday] + hour_oh])
+    # 区域聚类One-Hot（3维）：顺序与pd.get_dummies排序一致
+    region_type = get_cluster_type(int(region_row['区域编号']))
+    cluster_oh = [1 if region_type == ct else 0 for ct in CLUSTER_TYPES_ORDER]
+    # 滞后特征（2维）：预测时用0填充
+    lag_features = [0.0, 0.0]
+
+    features = np.array([continuous + [is_weekday] + hour_oh + cluster_oh + lag_features])
     return features
 
 
