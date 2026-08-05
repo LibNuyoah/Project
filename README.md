@@ -124,8 +124,9 @@ project/
 │   │   ├── problem3_solve.py          # 负荷转移（均匀/填谷两方案）
 │   │   └── problem3_result.py         # 效果评估 + 可视化
 │   │
-│   └── question4/                     # 问题4：三年增长（规划中）
-│       └── __init__.py
+│   └── question4/                     # 问题4：生命周期动态扩展规划
+│       ├── problem4_main.py            # 多情景推演 + 健康度 + 扩容（一站式）
+│       └── problem4_output/            # 输出图表（5张图 + 9张表）
 │
 ├── model/                             # 训练好的模型文件
 │   └── xgboost_model.pkl
