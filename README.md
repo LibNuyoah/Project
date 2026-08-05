@@ -46,10 +46,10 @@ python utils/check_data.py
 # 3. 运行全流程（约30-60分钟）
 python run_all.py
 
-# 或按问题单独运行
-python src/question1/main.py    # 问题1
-python src/question2/problem2_result.py  # 问题2
-python src/question3/problem3_result.py  # 问题3
+# 或按问题单独运行（Q2需在 src/question2/ 目录下运行）
+cd src/question1 && python main.py         # 问题1
+cd src/question2 && python problem2_result.py  # 问题2
+cd src/question3 && python problem3_result.py  # 问题3
 ```
 
 ---
@@ -137,8 +137,14 @@ project/
 │
 ├── docs/                              # 论文与参考资料
 │   ├── 2026_B题.docx
-│   ├── B题论文_v6.docx
-│   ├── problem2最终论文.docx
+│   ├── B题论文_v8.docx                # 最新论文（v8：修复问题二4个已知问题）
+│   ├── B题论文_v7.docx                # 队友上传原版
+│   ├── 工作日志.md                     # 小组工作日志
+│   ├── run_all修复说明.md              # run_all.py 修复记录
+│   ├── backup/                        # 修复前后代码备份
+│   │   ├── original/
+│   │   ├── modified/
+│   │   └── changes.diff
 │   ├── problem2框架.md
 │   └── 问题3框架.md
 │
@@ -199,7 +205,7 @@ project/
 | 新增慢充桩 | — | 48台 |
 | 总投资 | — | 74.4万元 |
 
-- Pareto前沿：成本 39~1511万元
+- Pareto前沿：成本 54~1628万元
 - 快充部署：凤凰山2台、新城2台、姚店1台、李渠1台
 
 ---
