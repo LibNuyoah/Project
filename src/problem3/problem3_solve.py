@@ -56,7 +56,7 @@ print(f'转移率: {ETA*100}%')
 
 def apply_uniform(df):
     df_a = df.copy()
-    df_a['调度后负荷'] = df_a['充电负荷'].values
+    df_a['调度后负荷'] = df_a['充电负荷'].astype(float).values
     for (rid, dtype), grp in df.groupby(['区域编号', '日期类型']):
         mask = (df_a['区域编号'] == rid) & (df_a['日期类型'] == dtype)
         idx = df_a[mask].index
@@ -97,7 +97,7 @@ def water_filling(valley_loads, Q):
 
 def apply_water_filling(df):
     df_b = df.copy()
-    df_b['调度后负荷'] = df_b['充电负荷'].values
+    df_b['调度后负荷'] = df_b['充电负荷'].astype(float).values
     for (rid, dtype), grp in df.groupby(['区域编号', '日期类型']):
         mask = (df_b['区域编号'] == rid) & (df_b['日期类型'] == dtype)
         idx = df_b[mask].index
