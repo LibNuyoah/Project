@@ -57,7 +57,9 @@ def main():
         script_dir = os.path.dirname(script_path)
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
-        result = subprocess.run([PYTHON, script_path], cwd=script_dir, env=env)
+        env['PYTHONUTF8'] = '1'
+        result = subprocess.run([PYTHON, script_path], cwd=script_dir, env=env,
+                                encoding='utf-8', errors='replace')
 
         if result.returncode != 0:
             print(f"\n[FAIL] {name} (exit code {result.returncode})")

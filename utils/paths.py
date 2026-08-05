@@ -107,6 +107,7 @@ FILE_CORRELATION_MATRIX = os.path.join(RESULTS_TABLES, 'correlation_matrix.xlsx'
 FILE_XGBOOST_METRICS = os.path.join(RESULTS_TABLES, 'xgboost_metrics.xlsx')
 FILE_SHAP_IMPORTANCE = os.path.join(RESULTS_TABLES, 'shap_importance.xlsx')
 FILE_XGBOOST_COMPARE = os.path.join(RESULTS_TABLES, 'xgboost_compare.xlsx')
+FILE_XGBOOST_GROUPKFOLD = os.path.join(RESULTS_TABLES, 'xgboost_groupkfold_results.xlsx')
 FILE_HOURLY_PREDICTION = os.path.join(RESULTS_TABLES, 'hourly_prediction.xlsx')
 FILE_MODEL_COMPARISON = os.path.join(RESULTS_TABLES, 'model_comparison.xlsx')
 FILE_STANDARDIZATION_PARAMS = os.path.join(RESULTS_TABLES, 'standardization_params.xlsx')

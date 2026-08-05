@@ -47,10 +47,9 @@ def load_data_and_model():
 
 
 def prepare_features(df):
-    """特征工程（与xgboost_model.py保持一致，含相关性筛选）"""
-    # 导入共享的特征工程函数（同目录下的 xgboost_model 模块）
+    """特征工程（与xgboost_model.py保持一致）"""
     from src.problem1.model.xgboost_model import prepare_features as pf
-    X, y, feature_names = pf(df)
+    X, y, feature_names, groups, _ = pf(df)
     return X, y, feature_names, df
 
 
