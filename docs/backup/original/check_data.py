@@ -25,9 +25,9 @@ EXIT_CODE = 0
 def check(msg, condition):
     global EXIT_CODE
     if condition:
-        print(f"  [OK] {msg}")
+        print(f"  ✅ {msg}")
     else:
-        print(f"  [FAIL] {msg}")
+        print(f"  ❌ {msg}")
         EXIT_CODE = 1
 
 
@@ -94,9 +94,9 @@ def main():
     # ── 结果 ──
     print("\n" + "=" * 60)
     if EXIT_CODE == 0:
-        print("[OK] All checks passed.")
+        print("✅ 所有检查通过，数据完整。")
     else:
-        print("[FAIL] Errors found, check data/raw/ directory.")
+        print("❌ 存在错误，请检查 data/raw/ 目录。")
     print("=" * 60)
 
     return EXIT_CODE

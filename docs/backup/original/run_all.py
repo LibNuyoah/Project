@@ -50,24 +50,20 @@ def main():
         print(f"    {script}")
         print(f"{'─' * 60}")
 
-        script_path = os.path.join(ROOT, script)
-        script_dir = os.path.dirname(script_path)
-        env = os.environ.copy()
-        env['PYTHONIOENCODING'] = 'utf-8'
-        result = subprocess.run([PYTHON, script_path], cwd=script_dir, env=env)
+        result = subprocess.run([PYTHON, script], cwd=ROOT)
 
         if result.returncode != 0:
-            print(f"\n[FAIL] {name} (exit code {result.returncode})")
+            print(f"\n❌ {name} 失败 (exit code {result.returncode})")
             failed.append(name)
             break
         else:
-            print(f"\n[OK] {name}")
+            print(f"\n✅ {name} 完成")
 
     print("\n" + "=" * 60)
     if failed:
-        print(f"[FAIL] Stopped at: {failed}")
+        print(f"❌ 运行中断，失败步骤: {failed}")
     else:
-        print("[OK] All steps completed!")
+        print("✅ 全部步骤运行完成！")
         print(f"\n输出文件位置:")
         print(f"  问题1预测: result/prediction_result.xlsx")
         print(f"  问题2配置: result/tables/")

@@ -626,8 +626,8 @@ output_files = [
     'output/NSGA-II收敛曲线数据.xlsx',
 ]
 for f in output_files:
-    status = 'OK' if os.path.exists(f) else 'MISS'
-    print(f'  [{status}] {f}')
+    exists = '✓' if os.path.exists(f) else '✗'
+    print(f'  [{exists}] {f}')
 
 print('\n' + '=' * 60)
 print('problem2_result.py 运行完成！')

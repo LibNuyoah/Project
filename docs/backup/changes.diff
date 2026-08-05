@@ -1,0 +1,77 @@
+diff --git a/run_all.py b/run_all.py
+index 49334d1..c342ce5 100644
+--- a/run_all.py
++++ b/run_all.py
+@@ -50,20 +50,24 @@ def main():
+         print(f"    {script}")
+         print(f"{'─' * 60}")
+ 
+-        result = subprocess.run([PYTHON, script], cwd=ROOT)
++        script_path = os.path.join(ROOT, script)
++        script_dir = os.path.dirname(script_path)
++        env = os.environ.copy()
++        env['PYTHONIOENCODING'] = 'utf-8'
++        result = subprocess.run([PYTHON, script_path], cwd=script_dir, env=env)
+ 
+         if result.returncode != 0:
+-            print(f"\n❌ {name} 失败 (exit code {result.returncode})")
++            print(f"\n[FAIL] {name} (exit code {result.returncode})")
+             failed.append(name)
+             break
+         else:
+-            print(f"\n✅ {name} 完成")
++            print(f"\n[OK] {name}")
+ 
+     print("\n" + "=" * 60)
+     if failed:
+-        print(f"❌ 运行中断，失败步骤: {failed}")
++        print(f"[FAIL] Stopped at: {failed}")
+     else:
+-        print("✅ 全部步骤运行完成！")
++        print("[OK] All steps completed!")
+         print(f"\n输出文件位置:")
+         print(f"  问题1预测: result/prediction_result.xlsx")
+         print(f"  问题2配置: result/tables/")
+diff --git a/src/question2/problem2_result.py b/src/question2/problem2_result.py
+index 0655739..b793e06 100644
+--- a/src/question2/problem2_result.py
++++ b/src/question2/problem2_result.py
+@@ -626,8 +626,8 @@ output_files = [
+     'output/NSGA-II收敛曲线数据.xlsx',
+ ]
+ for f in output_files:
+-    exists = '✓' if os.path.exists(f) else '✗'
+-    print(f'  [{exists}] {f}')
++    status = 'OK' if os.path.exists(f) else 'MISS'
++    print(f'  [{status}] {f}')
+ 
+ print('\n' + '=' * 60)
+ print('problem2_result.py 运行完成！')
+diff --git a/utils/check_data.py b/utils/check_data.py
+index f7f0e2c..d98d335 100644
+--- a/utils/check_data.py
++++ b/utils/check_data.py
+@@ -25,9 +25,9 @@ EXIT_CODE = 0
+ def check(msg, condition):
+     global EXIT_CODE
+     if condition:
+-        print(f"  ✅ {msg}")
++        print(f"  [OK] {msg}")
+     else:
+-        print(f"  ❌ {msg}")
++        print(f"  [FAIL] {msg}")
+         EXIT_CODE = 1
+ 
+ 
+@@ -94,9 +94,9 @@ def main():
+     # ── 结果 ──
+     print("\n" + "=" * 60)
+     if EXIT_CODE == 0:
+-        print("✅ 所有检查通过，数据完整。")
++        print("[OK] All checks passed.")
+     else:
+-        print("❌ 存在错误，请检查 data/raw/ 目录。")
++        print("[FAIL] Errors found, check data/raw/ directory.")
+     print("=" * 60)
+ 
+     return EXIT_CODE
