@@ -96,11 +96,11 @@ project/
 │   └── xgboost_model.pkl               # XGBoost残差模型
 │
 ├── results/
-│   ├── prediction_result.xlsx          # Q1: 10区域预测汇总
-│   ├── figures/                        # 所有可视化图表
-│   ├── tables/                         # 所有数据表格
-│   ├── q3_output/                      # Q3中间数据与图表
-│   └── q4_output/                      # Q4输出图表
+│   ├── prediction_result.xlsx          # Q1: 10区域预测汇总表
+│   ├── figures/                        # Q1+Q2+分析: 15张图表
+│   ├── tables/                         # Q1+Q2+分析: 13张数据表
+│   ├── q3_output/                      # Q3: 5张图 + 3张表
+│   └── q4_output/                      # Q4: 5张图 + 7张表
 │
 ├── src/
 │   ├── problem1/
@@ -174,6 +174,19 @@ project/
 | RMSE | 82.9 ± 4.0 kW |
 | R² | 0.644 ± 0.067 |
 
+### 输出成果
+
+| 类型 | 文件 | 说明 |
+|:---|------|------|
+| 📊 图 | `results/figures/prediction_summary.png` | 四面板汇总图：日均需求柱状图 + 24h曲线 + 类型占比 + 报告 |
+| 📊 图 | `results/figures/xgboost_evaluation.png` | XGBoost残差拟合评价：散点图 + 特征重要性 + 残差分布 + 参数 |
+| 📊 图 | `results/figures/cluster_analysis.png` | 区域聚类分析：肘部法则 + PCA + 树状图 + 特征画像 + 轮廓系数 |
+| 📋 表 | `results/prediction_result.xlsx` | 10区域预测汇总（含附件3真实值对比列） |
+| 📋 表 | `results/tables/hourly_prediction.xlsx` | 480条分时段预测（10区×24h×2日期类型） |
+| 📋 表 | `results/tables/xgboost_metrics.xlsx` | XGBoost训练指标（MAE/RMSE/R²） |
+| 📋 表 | `results/tables/cluster_result.xlsx` | 区域功能聚类结果 |
+| 💾 模型 | `models/xgboost_model.pkl` | 训练好的XGBoost残差预测模型 |
+
 ---
 
 ## 问题2：NSGA-II 四目标优化
@@ -201,6 +214,23 @@ project/
 | 过载风险区域 | 2 | **2** (未恶化) |
 | 总投资 | — | 213.2万元 |
 
+### 输出成果
+
+| 类型 | 文件 | 说明 |
+|:---|------|------|
+| 📊 图 | `results/figures/图1_建设紧迫度与供需缺口.png` | 双面板：紧迫度排序 + 供需缺口柱状图 |
+| 📊 图 | `results/figures/图2_空间溢出权重热力图.png` | 10×10空间溢出权重矩阵热力图 |
+| 📊 图 | `results/figures/图3_NSGA-II求解过程.png` | 三面板：收敛曲线 + Pareto前沿 + 平行坐标 |
+| 📊 图 | `results/figures/图4_TOPSIS最优解选取.png` | 双面板：TOPSIS评分 + 熵权法权重饼图 |
+| 📊 图 | `results/figures/图5_配置方案与优化效果对比.png` | 双面板：配置方案对比 + 优化前后指标 |
+| 📋 表 | `results/tables/表1_各区域供需缺口与建设紧迫度.xlsx` | 供需缺口/电网容量/紧迫度排名 |
+| 📋 表 | `results/tables/表2_各区域最优配置方案.xlsx` | TOPSIS最优解：各区域新增快充/慢充数 |
+| 📋 表 | `results/tables/表3_优化前后多指标对比.xlsx` | 覆盖率/过载/负荷率等6项指标对比 |
+| 📋 表 | `results/tables/Pareto前沿解集.xlsx` | 100个Pareto非支配解完整数据 |
+| 📋 表 | `results/tables/NSGA-II收敛曲线数据.xlsx` | 500代收敛过程记录 |
+| 📋 表 | `results/tables/空间溢出权重矩阵.xlsx` | 基于距离矩阵的10×10溢出权重 |
+| 📋 表 | `results/tables/区域距离矩阵.xlsx` | 10区域间欧氏距离矩阵 |
+
 ---
 
 ## 问题3：分时电价调度
@@ -211,6 +241,19 @@ project/
 |------|------|:---:|:---:|
 | A 均匀迁移 | 20%高峰负荷均匀分配到低谷 | **31.2%** | 51.2% |
 | B 经济调度 | 价格信号引导(谷0.5/平1.0/峰1.5) | 30.0% | 58.5% |
+
+### 输出成果
+
+| 类型 | 文件 | 说明 |
+|:---|------|------|
+| 📊 图 | `results/q3_output/图15_全市调度前后负荷曲线对比.png` | 调度前后全市24h负荷曲线对比 |
+| 📊 图 | `results/q3_output/图16_各区域峰谷差降低率.png` | 10区域峰谷差降低率柱状图 |
+| 📊 图 | `results/q3_output/图17_各区域分面负荷曲线.png` | 10区域×2日期类型分面负荷曲线 |
+| 📊 图 | `results/q3_output/图18_各区域峰谷差对比.png` | 调度前后各区域峰谷差对比 |
+| 📊 图 | `results/q3_output/图19_过载风险消除效果.png` | 过载风险消除效果展示 |
+| 📋 表 | `results/q3_output/表_调度前分析.xlsx` | 调度前峰谷差/负荷率/过载统计 |
+| 📋 表 | `results/q3_output/表A_调度前后峰谷差对比.xlsx` | 方案A/B调度前后峰谷差对比 |
+| 📋 表 | `results/q3_output/表B_过载风险评估.xlsx` | 各区域过载风险评估结果 |
 
 ---
 
@@ -230,6 +273,24 @@ project/
 | 低增长 | 10% | 0区域 | 1区域 | 13.6万 |
 | 基准 | 15% | 1区域 | 2区域 | 43.6万 |
 | 高增长 | 20% | 1区域 | 4区域 | 79.6万 |
+
+### 输出成果
+
+| 类型 | 文件 | 说明 |
+|:---|------|------|
+| 📊 图 | `results/q4_output/图1_多情景需求增长曲线.png` | 三情景全市需求增长 + 各区域2026vs2028对比 |
+| 📊 图 | `results/q4_output/图2_健康度热力图.png` | 三情景×3年 10区域健康度热力图 |
+| 📊 图 | `results/q4_output/图3_调度有效容量对比.png` | 调度前后服务容量对比 + 容量提升比例 |
+| 📊 图 | `results/q4_output/图4_扩容优先级排序.png` | 基准增长下2028年各区域扩容优先级 |
+| 📊 图 | `results/q4_output/图5_三年动态扩容方案.png` | 各情景投资曲线 + 快充/慢充堆叠构成 |
+| 📋 表 | `results/q4_output/problem4_final_result.xlsx` | 综合输出（6 sheet：需求/容量/健康度/优先级/方案/汇总） |
+| 📋 表 | `results/q4_output/未来需求推演.xlsx` | 3情景×3年×10区域需求推演（90条） |
+| 📋 表 | `results/q4_output/健康度评价.xlsx` | 四维健康度指标详细数据 |
+| 📋 表 | `results/q4_output/有效容量分析.xlsx` | 调度前后有效容量对比 |
+| 📋 表 | `results/q4_output/扩容优先级.xlsx` | 各区域扩容优先级评分 |
+| 📋 表 | `results/q4_output/动态扩容方案.xlsx` | DP优化后的逐年扩容方案 |
+| 📋 表 | `results/q4_output/未来三年扩展规划.xlsx` | 完整三年扩展规划汇总 |
+| 📋 表 | `results/q4_output/情景对比汇总.xlsx` | 三种情景关键指标对比 |
 
 ---
 
@@ -282,6 +343,16 @@ project/
 | 5x | **40%** | **40%** |
 
 > 电价比越高(峰时越贵)，最优转移率越高。当前采用20%转移率偏保守，若电价差扩大至5x，可提升至40%转移率。
+
+### 输出成果
+
+| 类型 | 文件 | 说明 |
+|:---|------|------|
+| 📊 图 | `results/figures/ablation.png` | 消融实验三面板柱状图（MAE/RMSE/R²对比） |
+| 📊 图 | `results/figures/sensitivity_analysis.png` | 敏感性分析三面板（超参数/成本比/转移率） |
+| 📋 表 | `results/tables/模型消融实验.xlsx` | 5种模型变体完整对比数据 |
+| 📋 表 | `results/tables/robustness.xlsx` | 5种子鲁棒性验证统计（均值/标准差/最大/最小） |
+| 📋 表 | `results/tables/敏感性分析.xlsx` | 三sheet敏感性数据（Q1超参/Q2成本比/Q3转移率） |
 
 ---
 

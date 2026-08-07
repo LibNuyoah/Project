@@ -15,17 +15,15 @@
 
 import pandas as pd
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os, sys, pickle, warnings
 warnings.filterwarnings('ignore')
 
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
-
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
+
+from utils.mpl_setup import setup_chinese
+setup_chinese()
 from utils.paths import (
     RESULTS_TABLES, RESULTS_FIGURES,
     FILE_ATTACHMENT1, FILE_ATTACHMENT2, FILE_ATTACHMENT3, FILE_ATTACHMENT4

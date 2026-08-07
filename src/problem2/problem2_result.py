@@ -50,10 +50,9 @@ from utils.paths import (
 # =============================================================================
 # 全局绘图风格设置
 # =============================================================================
+from utils.mpl_setup import setup_chinese
+setup_chinese()
 plt.rcParams.update({
-    'font.family': 'sans-serif',
-    'font.sans-serif': ['Microsoft YaHei', 'SimHei', 'DejaVu Sans'],
-    'axes.unicode_minus': False,
     'figure.dpi': 150, 'savefig.dpi': 300, 'savefig.bbox': 'tight',
     'font.size': 9,
 })

@@ -9,16 +9,11 @@
 
 import pandas as pd
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import sys
 import warnings
 warnings.filterwarnings('ignore')
-
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, AgglomerativeClustering
@@ -30,6 +25,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.a
 sys.path.insert(0, ROOT)
 
 from utils.paths import RESULTS_DIR, RESULTS_FIGURES, RESULTS_TABLES, DATA_RAW, FILE_ATTACHMENT1, FILE_CLUSTER_RESULT
+from utils.mpl_setup import setup_chinese
+setup_chinese()
 
 REGION_NAMES = {
     1: '宝塔山街道', 2: '南市街道', 3: '凤凰山街道',

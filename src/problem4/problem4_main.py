@@ -37,11 +37,9 @@ from utils.paths import (
     FILE_Q4_PRIORITY, FILE_Q4_CAPACITY, FILE_Q4_SCENARIO, FILE_Q4_PLAN
 )
 
-plt.rcParams.update({
-    'font.sans-serif': ['Microsoft YaHei','SimHei','DejaVu Sans'],
-    'axes.unicode_minus': False, 'figure.dpi': 150, 'savefig.dpi': 300,
-    'savefig.bbox': 'tight',
-})
+from utils.mpl_setup import setup_chinese
+setup_chinese()
+plt.rcParams.update({'figure.dpi': 150, 'savefig.dpi': 300, 'savefig.bbox': 'tight'})
 
 # 使用RESULTS_Q4作为输出目录
 OUTPUT_DIR = RESULTS_Q4
