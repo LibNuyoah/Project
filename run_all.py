@@ -24,9 +24,12 @@ STEPS = [
     ('Q1-3 双层预测模型', 'src/problem1/model/two_layer_model.py'),
 
     # ── 问题2：充电桩优化配置 ──
-    ('Q2-1 供需分析',     'src/problem2/problem2_data.py'),
-    ('Q2-2 NSGA-II优化',  'src/problem2/problem2_optimize.py'),
-    ('Q2-3 结果汇总',     'src/problem2/problem2_result.py'),
+    # 注：Q2-1和Q2-2包含NSGA-II随机优化，跨平台结果不可复现。
+    # 中间文件（preprocess_data.npz / optimization_result.npz）需随项目一并提交，
+    # run_all.py仅运行结果汇总脚本，确保评委评测结果与论文一致。
+    # ('Q2-1 供需分析',     'src/problem2/problem2_data.py'),
+    # ('Q2-2 NSGA-II优化',  'src/problem2/problem2_optimize.py'),
+    ('Q2 结果汇总',       'src/problem2/problem2_result.py'),
 
     # ── 问题3：分时电价调度 ──
     ('Q3-1 调度前分析',   'src/problem3/problem3_data.py'),
