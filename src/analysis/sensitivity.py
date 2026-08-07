@@ -129,7 +129,7 @@ def section_7_0():
         # 标注最优
         ax.axvline(x=best_series.idxmin(), color=color, ls='--', alpha=0.5)
     fig.subplots_adjust(bottom=0.12)
-    fig.text(0.5, 0.01, '图24 Q1 XGBoost超参数与残差拟合MAE灵敏度', ha='center', fontsize=9, transform=fig.transFigure)
+    fig.text(0.5, 0.01, '图22 Q1 XGBoost超参数与残差拟合MAE灵敏度', ha='center', fontsize=9, transform=fig.transFigure)
     fig.savefig(os.path.join(OUT_DIR, '图_Q1超参数灵敏度.png'), dpi=200, bbox_inches='tight')
     plt.close()
     print('  图_Q1超参数灵敏度.png 已保存')
@@ -232,7 +232,7 @@ def section_7_1():
     ax.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90, textprops={'fontsize': 7})
     plt.tight_layout()
     fig1.subplots_adjust(bottom=0.12)
-    fig1.text(0.5, 0.01, '图25 不同权重组合下的方案选择频率', ha='center', fontsize=9, transform=fig1.transFigure)
+    fig1.text(0.5, 0.01, '图23 不同权重组合下的方案选择频率', ha='center', fontsize=9, transform=fig1.transFigure)
     fig1.savefig(os.path.join(OUT_DIR, '图_方案选择分布.png'), dpi=200, bbox_inches='tight')
     plt.close()
     print('  图_方案选择分布.png 已保存')
@@ -259,7 +259,7 @@ def section_7_1():
     plt.colorbar(im, ax=ax2, label='最优方案成本 (万元)', shrink=0.8)
     plt.tight_layout()
     fig2.subplots_adjust(bottom=0.12)
-    fig2.text(0.5, 0.01, '图26 权重组合对最优方案成本的影响 (w4=0.15)', ha='center', fontsize=9, transform=fig2.transFigure)
+    fig2.text(0.5, 0.01, '图24 权重组合对最优方案成本的影响 (w4=0.15)', ha='center', fontsize=9, transform=fig2.transFigure)
     fig2.savefig(os.path.join(OUT_DIR, '图_权重热力图.png'), dpi=200, bbox_inches='tight')
     plt.close()
     print('  图_权重热力图.png 已保存')
@@ -298,7 +298,7 @@ def section_7_2(obj1, obj2, obj3, obj4, fast, slow):
         ax1.axvline(x=97, color='grey', linestyle=':', alpha=0.5); ax1.text(97.2, ax1.get_ylim()[1]*0.5, 'Pareto最低97%', fontsize=7, color='grey')
     plt.tight_layout()
     fig1.subplots_adjust(bottom=0.12)
-    fig1.text(0.5, 0.01, '图27 覆盖率下限对可行解规模和最优成本的影响', ha='center', fontsize=9, transform=fig1.transFigure)
+    fig1.text(0.5, 0.01, '图25 覆盖率下限对可行解规模和最优成本的影响', ha='center', fontsize=9, transform=fig1.transFigure)
     fig1.savefig(os.path.join(OUT_DIR, '图_覆盖率下限灵敏度.png'), dpi=200, bbox_inches='tight')
     plt.close()
     print('  图_覆盖率下限灵敏度.png 已保存')
@@ -338,7 +338,7 @@ def section_7_2(obj1, obj2, obj3, obj4, fast, slow):
     ax3.grid(alpha=0.3, ls='--')
     plt.tight_layout()
     fig2.subplots_adjust(bottom=0.12)
-    fig2.text(0.5, 0.01, '图28 充电桩成本比对最优快充占比的影响', ha='center', fontsize=9, transform=fig2.transFigure)
+    fig2.text(0.5, 0.01, '图26 充电桩成本比对最优快充占比的影响', ha='center', fontsize=9, transform=fig2.transFigure)
     fig2.savefig(os.path.join(OUT_DIR, '图_成本比灵敏度.png'), dpi=200, bbox_inches='tight')
     plt.close()
     print('  图_成本比灵敏度.png 已保存')
@@ -467,7 +467,7 @@ def section_7_3():
     ax.legend(fontsize=7, loc='upper left'); ax.grid(alpha=0.3, ls='--')
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.12)
-    fig.text(0.5, 0.01, '图29 负荷转移率η对峰谷差降低效果的影响', ha='center', fontsize=9, transform=fig.transFigure)
+    fig.text(0.5, 0.01, '图27 负荷转移率η对峰谷差降低效果的影响', ha='center', fontsize=9, transform=fig.transFigure)
     fig.savefig(os.path.join(OUT_DIR, '图_η削峰效果曲线.png'), dpi=200, bbox_inches='tight')
     plt.close()
     print('  表_η灵敏度分析.xlsx 已保存')
@@ -601,7 +601,7 @@ def section_7_4():
     ax1.set_ylim(0.65, 1.0)
     plt.tight_layout()
     fig1.subplots_adjust(bottom=0.12)
-    fig1.text(0.5, 0.01, '图30 不同调度转化系数α下充电网络健康度随增长率退化', ha='center', fontsize=9, transform=fig1.transFigure)
+    fig1.text(0.5, 0.01, '图28 不同调度转化系数α下充电网络健康度随增长率退化', ha='center', fontsize=9, transform=fig1.transFigure)
     fig1.savefig(os.path.join(OUT_DIR, '图_健康度退化曲线.png'), dpi=200, bbox_inches='tight')
     plt.close()
 
@@ -619,7 +619,7 @@ def section_7_4():
                 ax2.text(ri, ai, f'{cost_map[ai,ri]:.0f}', ha='center', va='center', fontsize=6, color='white', fontweight='bold')
     plt.tight_layout()
     fig2.subplots_adjust(bottom=0.12)
-    fig2.text(0.5, 0.01, '图31 扩容总成本随r-α变化热力图', ha='center', fontsize=9, transform=fig2.transFigure)
+    fig2.text(0.5, 0.01, '图29 扩容总成本随r-α变化热力图', ha='center', fontsize=9, transform=fig2.transFigure)
     fig2.savefig(os.path.join(OUT_DIR, '图_r_α扩容边界热力图.png'), dpi=200, bbox_inches='tight')
     plt.close()
 
@@ -664,6 +664,33 @@ def section_7_5():
 
     df_summary.to_excel(os.path.join(OUT_DIR, '表_综合灵敏度评估.xlsx'), index=False)
     print('  表_综合灵敏度评估.xlsx 已保存')
+
+    # 生成图表版
+    fig, ax = plt.subplots(figsize=(12, 3.5))
+    ax.axis('off')
+    col_labels = ['分析维度', '参数范围', '敏感度', '结论要点']
+    cell_text = df_summary.values.tolist()
+    # 敏感度列上色
+    color_map = {'低': '#2ECC71', '中': '#F39C12', '高': '#E74C3C',
+                 '中（工作日）/ 低（周末）': '#F39C12'}
+    cell_colors = []
+    for _, row in df_summary.iterrows():
+        c = color_map.get(row['敏感度'], '#FFFFFF')
+        cell_colors.append(['#F8F9FA', '#F8F9FA', c, '#FFFFFF'])
+    table = ax.table(cellText=cell_text, colLabels=col_labels, cellLoc='left', loc='center',
+                     colWidths=[0.15, 0.22, 0.10, 0.53])
+    table.auto_set_font_size(False); table.set_fontsize(8)
+    table.scale(1, 1.5)
+    for i in range(len(cell_text)+1):
+        for j in range(4):
+            if j == 2 and i > 0:
+                table[(i,j)].set_facecolor(cell_colors[i-1][j])
+    plt.tight_layout()
+    fig.subplots_adjust(bottom=0.08)
+    fig.text(0.5, 0.02, '表7-1 综合灵敏度评估', ha='center', fontsize=10, transform=fig.transFigure)
+    fig.savefig(os.path.join(OUT_DIR, '表7-1_综合灵敏度评估.png'), dpi=200, bbox_inches='tight')
+    plt.close()
+    print('  表7-1_综合灵敏度评估.png 已保存')
     print(df_summary.to_string(index=False))
 
 
