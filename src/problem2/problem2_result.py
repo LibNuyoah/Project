@@ -62,8 +62,8 @@ COLOR_BLUE = '#2B579A'; COLOR_ORANGE = '#E07B39'
 COLOR_GREEN = '#3A8E6F'; COLOR_RED = '#C44E52'; COLOR_GREY = '#8C8C8C'
 PALETTE_3 = [COLOR_BLUE, COLOR_ORANGE, COLOR_GREEN]
 
-REGION_NAMES = ['宝塔山街道', '南市街道', '凤凰山街道', '枣园街道', '桥沟街道',
-                '新城街道', '柳林镇', '河庄坪镇', '姚店镇', '李渠镇']
+REGION_NAMES = ['宝塔山街道', '南市街道', '凤凰山街道', '桥沟街道', '枣园街道',
+                '新城街道', '河庄坪镇', '姚店镇（经开区）', '万花山镇', '真武洞街道（安塞）']
 REGION_TYPES = ['老城核心区', '老城核心区', '城市新区', '老城核心区', '城市新区',
                 '城市新区', '城郊/工业区', '城郊/工业区', '城郊/工业区', '城郊/工业区']
 N_REGIONS = 10
@@ -82,6 +82,7 @@ data_opt = np.load(FILE_Q2_OPTIMIZATION, allow_pickle=True)
 pareto_obj1 = data_opt['pareto_obj1']
 pareto_obj2 = data_opt['pareto_obj2']
 pareto_obj3 = data_opt['pareto_obj3']
+pareto_obj4 = data_opt['pareto_obj4'] if 'pareto_obj4' in data_opt else np.zeros(len(pareto_obj1))
 pareto_fast = data_opt['pareto_fast']
 pareto_slow = data_opt['pareto_slow']
 convergence = data_opt['convergence_history'].item()
@@ -101,7 +102,7 @@ print('\n' + '=' * 60)
 print('步骤1: 熵权-TOPSIS选取最优折中方案')
 print('=' * 60)
 
-COV_LOWER = 0.90; COV_UPPER = 0.99
+COV_LOWER = 0.80; COV_UPPER = 1.00  # 匹配优化器约束，覆盖率≥80%纳入候选
 feasible_mask = (pareto_obj2 >= COV_LOWER) & (pareto_obj2 <= COV_UPPER)
 if feasible_mask.sum() < 3:
     feasible_mask = pareto_obj2 >= COV_LOWER
@@ -113,12 +114,13 @@ n_c = len(candidate_idx)
 c_obj1 = pareto_obj1[candidate_idx]
 c_obj2_raw = pareto_obj2[candidate_idx]
 c_obj3 = pareto_obj3[candidate_idx]
+c_obj4 = pareto_obj4[candidate_idx]
 c_obj2 = np.where(c_obj2_raw > COV_LOWER, COV_LOWER + 0.5 * (c_obj2_raw - COV_LOWER), c_obj2_raw)
-c_obj_matrix = np.column_stack([c_obj1, c_obj2, c_obj3])
+c_obj_matrix = np.column_stack([c_obj1, c_obj2, c_obj3, c_obj4])
 
-c_norm = np.zeros((n_c, 3))
-directions = ['cost', 'benefit', 'cost']
-for j in range(3):
+c_norm = np.zeros((n_c, 4))
+directions = ['cost', 'benefit', 'cost', 'cost']  # 4目标: 成本↓, 覆盖率↑, 均衡↓, 风险↓
+for j in range(4):
     col = c_obj_matrix[:, j]
     col_min, col_max = col.min(), col.max()
     if col_max > col_min:
@@ -127,9 +129,11 @@ for j in range(3):
         else:
             c_norm[:, j] = (col_max - col) / (col_max - col_min)
 
-c_p = np.clip(c_norm / c_norm.sum(axis=0, keepdims=True), 1e-10, 1)
+c_p = np.clip(c_norm / (c_norm.sum(axis=0, keepdims=True) + 1e-10), 1e-10, 1)
 c_e = -np.sum(c_p * np.log(c_p), axis=0) / np.log(n_c)
-c_w = (1 - c_e) / np.sum(1 - c_e)
+c_e = np.nan_to_num(c_e, nan=0.0)
+c_w = (1 - c_e) / (np.sum(1 - c_e) + 1e-10)
+c_w = np.nan_to_num(c_w, nan=0.25)  # 回退等权重
 c_weighted = c_norm * c_w
 c_pos = c_weighted.max(axis=0); c_neg = c_weighted.min(axis=0)
 c_dpos = np.sqrt(np.sum((c_weighted - c_pos)**2, axis=1))
@@ -138,13 +142,13 @@ c_close = c_dneg / (c_dpos + c_dneg)
 
 best_local = np.argmax(c_close)
 best_idx = candidate_idx[best_local]
-best_idx = 55  # 方案#56: 手动选择已验证最优
 
-print(f'\n三目标权重: 成本={c_w[0]:.4f}, 覆盖率={c_w[1]:.4f}, 负荷均衡={c_w[2]:.4f}')
+print(f'\n四目标权重: 成本={c_w[0]:.4f}, 覆盖率={c_w[1]:.4f}, 负荷均衡={c_w[2]:.4f}, 电网风险={c_w[3]:.4f}')
 print(f'\n最优方案: #{best_idx+1}')
 print(f'  成本: {pareto_obj1[best_idx]:.1f} 万元')
 print(f'  覆盖率: {pareto_obj2[best_idx]:.4f} ({pareto_obj2[best_idx]*100:.1f}%)')
 print(f'  负荷率方差: {pareto_obj3[best_idx]:.6f}')
+print(f'  电网风险指数: {pareto_obj4[best_idx]:.6f}')
 
 best_fast = pareto_fast[best_idx].astype(int)
 best_slow = pareto_slow[best_idx].astype(int)
@@ -230,11 +234,12 @@ ax3b.scatter(pareto_obj1[best_idx], pareto_obj2[best_idx] * 100,
 ax3b.legend(fontsize=7, loc='lower right')
 
 ax3c = fig3.add_subplot(1, 3, 3)
-obj_norm = np.zeros_like(np.column_stack([pareto_obj1, pareto_obj2, pareto_obj3]))
+obj_norm = np.zeros((len(pareto_obj1), 4))
 obj_norm[:, 0] = (pareto_obj1 - pareto_obj1.min()) / (pareto_obj1.max() - pareto_obj1.min() + 1e-10)
 obj_norm[:, 1] = (pareto_obj2.max() - pareto_obj2) / (pareto_obj2.max() - pareto_obj2.min() + 1e-10)
 obj_norm[:, 2] = (pareto_obj3 - pareto_obj3.min()) / (pareto_obj3.max() - pareto_obj3.min() + 1e-10)
-x_axes = [0, 1, 2]; labels = ['成本', '覆盖率', '负荷均衡']
+obj_norm[:, 3] = (pareto_obj4 - pareto_obj4.min()) / (pareto_obj4.max() - pareto_obj4.min() + 1e-10)
+x_axes = [0, 1, 2, 3]; labels = ['成本', '覆盖率', '负荷均衡', '电网风险']
 for i in range(min(50, len(pareto_obj1))):
     alpha_val = 0.15; color = COLOR_GREY; lw = 0.6
     if i == best_idx: alpha_val = 1.0; color = COLOR_RED; lw = 2.0
@@ -267,10 +272,12 @@ ax4a.invert_yaxis(); ax4a.set_xlim(0, 1.05)
 for i, v in enumerate(top_closeness):
     ax4a.text(v + 0.005, i, f'{v:.4f}', va='center', fontsize=6, color='#333333')
 
-c_w_labels = [f'成本\n({c_w[0]*100:.1f}%)', f'覆盖率\n({c_w[1]*100:.1f}%)', f'负荷均衡\n({c_w[2]*100:.1f}%)']
-ax4b.pie(c_w, labels=c_w_labels, colors=PALETTE_3, autopct='', startangle=90,
-         explode=(0.02, 0.02, 0.02), textprops={'fontsize': 8})
-ax4b.set_title('(b) 熵权法三目标权重', fontsize=10, fontweight='bold')
+c_w_labels = [f'成本\n({c_w[0]*100:.1f}%)', f'覆盖率\n({c_w[1]*100:.1f}%)',
+               f'负荷均衡\n({c_w[2]*100:.1f}%)', f'电网风险\n({c_w[3]*100:.1f}%)']
+PALETTE_4 = [COLOR_BLUE, COLOR_ORANGE, COLOR_GREEN, '#E74C3C']
+ax4b.pie(c_w, labels=c_w_labels, colors=PALETTE_4, autopct='', startangle=90,
+         explode=(0.02, 0.02, 0.02, 0.02), textprops={'fontsize': 8})
+ax4b.set_title('(b) 熵权法四目标权重', fontsize=10, fontweight='bold')
 plt.tight_layout()
 fig4.savefig(os.path.join(RESULTS_FIGURES, '图4_TOPSIS最优解选取.png'), dpi=300, bbox_inches='tight')
 plt.close()

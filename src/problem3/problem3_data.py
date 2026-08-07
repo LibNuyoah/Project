@@ -33,8 +33,8 @@ from utils.paths import (
     RESULTS_Q3, FILE_Q3_BEFORE_ANALYSIS, FILE_Q3_PREPROCESS, FILE_Q3_MERGED_DATA
 )
 
-REGION_NAMES = ['宝塔山街道', '南市街道', '凤凰山街道', '枣园街道', '桥沟街道',
-                '新城街道', '柳林镇', '河庄坪镇', '姚店镇', '李渠镇']
+REGION_NAMES = ['宝塔山街道', '南市街道', '凤凰山街道', '桥沟街道', '枣园街道',
+                '新城街道', '河庄坪镇', '姚店镇（经开区）', '万花山镇', '真武洞街道（安塞）']
 N_REGIONS = 10
 
 # 附件5参数

@@ -21,9 +21,7 @@ STEPS = [
     # ── 问题1：充电需求分析与预测 ──
     ('Q1-1 数据清洗',     'src/problem1/preprocess/data_clean.py'),
     ('Q1-2 区域聚类',     'src/problem1/analysis/cluster_analysis.py'),
-    ('Q1-3 XGBoost模型',  'src/problem1/model/xgboost_model.py'),
-    ('Q1-4 SHAP解释',     'src/problem1/model/shap_analysis.py'),
-    ('Q1-5 预测汇总',     'src/problem1/main.py'),
+    ('Q1-3 双层预测模型', 'src/problem1/model/two_layer_model.py'),
 
     # ── 问题2：充电桩优化配置 ──
     ('Q2-1 供需分析',     'src/problem2/problem2_data.py'),
@@ -37,6 +35,11 @@ STEPS = [
 
     # ── 问题4：生命周期动态扩展规划 ──
     ('Q4 动态扩展规划',   'src/problem4/problem4_main.py'),
+
+    # ── 辅助分析（可选，验证模型稳健性）──
+    ('消融实验',          'src/analysis/ablation.py'),
+    ('鲁棒性验证',        'src/analysis/robustness_test.py'),
+    ('敏感性分析',        'src/analysis/sensitivity.py'),
 ]
 
 
@@ -79,6 +82,7 @@ def main():
         print(f"  问题3评估: results/q3_output/")
         print(f"  问题4规划: results/q4_output/")
         print(f"  可视化图: results/figures/")
+        print(f"  分析验证: results/tables/消融实验/鲁棒性/敏感性分析")
     print("=" * 60)
 
     return 1 if failed else 0

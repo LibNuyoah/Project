@@ -32,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, ROOT)
 
 from utils.paths import (
-    RESULTS_Q4, RESULTS_FIGURES, FILE_PREDICTION_RESULT,
+    RESULTS_Q4, RESULTS_FIGURES, RESULTS_TABLES, FILE_PREDICTION_RESULT,
     FILE_Q4_FINAL_RESULT, FILE_Q4_DEMAND, FILE_Q4_HEALTH, FILE_Q4_EXPANSION,
     FILE_Q4_PRIORITY, FILE_Q4_CAPACITY, FILE_Q4_SCENARIO, FILE_Q4_PLAN
 )
@@ -49,8 +49,8 @@ OUTPUT_DIR = RESULTS_Q4
 # ========================================================================
 # 常量与参数
 # ========================================================================
-REGION_NAMES = ['宝塔山街道','南市街道','凤凰山街道','枣园街道','桥沟街道',
-                '新城街道','柳林镇','河庄坪镇','姚店镇','李渠镇']
+REGION_NAMES = ['宝塔山街道','南市街道','凤凰山街道','桥沟街道','枣园街道',
+                '新城街道','河庄坪镇','姚店镇（经开区）','万花山镇','真武洞街道（安塞）']
 N = 10; YEARS = [2026, 2027, 2028]
 
 # 增长率：基准15%（题目原文）±5%灵敏度
@@ -85,12 +85,22 @@ except:
 D0 = df_pred['预测日均需求_kWh'].values
 P0 = df_pred['峰值负荷_kWh'].values
 
-# Q2方案#56
-BF = np.array([0,0,2,0,0,2,0,0,1,1])
-BS = np.array([2,3,0,11,7,1,6,5,6,7])
-COV = np.array([0.9203,1.0,1.0,0.9193,0.9098,0.9466,1.0,0.9353,1.0,1.0])
-EF = np.array([129,119,99,109,76,95,45,59,39,53])
-ES = np.array([86,79,66,73,50,63,30,39,26,35])
+# Q2方案：从优化结果动态加载
+try:
+    df_q2 = pd.read_excel(os.path.join(RESULTS_TABLES, '表2_各区域最优配置方案.xlsx'))
+    BF = df_q2['新增快充桩(台)'].values
+    BS = df_q2['新增慢充桩(台)'].values
+    COV = df_q2['地理覆盖率'].values
+    EF = df_q2['现有快充桩(台)'].values
+    ES = df_q2['现有慢充桩(台)'].values
+    print('  Q2方案: 从表2动态加载')
+except Exception:
+    BF = np.array([0,0,2,0,0,2,0,0,1,1])
+    BS = np.array([2,3,0,11,7,1,6,5,6,7])
+    COV = np.array([0.9203,1.0,1.0,0.9193,0.9098,0.9466,1.0,0.9353,1.0,1.0])
+    EF = np.array([129,119,99,109,76,95,45,59,39,53])
+    ES = np.array([86,79,66,73,50,63,30,39,26,35])
+    print('  Q2方案: 回退至默认值')
 
 # 区域基础数据
 AREA = np.array([17.36,14.25,17.62,110.07,80.10,60.08,139.87,120.04,131.20,22.30])
@@ -146,20 +156,41 @@ all_priority = []
 all_op_cap = []
 final_summary = []
 
-for sc, r in SCENARIOS.items():
-    # 累计扩容（从Q2基线开始）
-    cum_f = BF.copy().astype(float)
-    cum_s = BS.copy().astype(float)
+def dp_expand(H, rho, ov, trips, cap_eff, pk_d, cov_i, area_i, scov_i, cum_f, cum_s):
+    """
+    DP搜索最优扩容方案:
+    min cost + 0.5×供需缺口 + 0.3×电网风险
+    """
+    best_action = (0, 0, 1e9)  # (nf, ns, min_cost)
+    # 搜索空间: 快充0-20, 慢充0-40 (以5为步长控制搜索规模)
+    for nf in range(0, 21, 5):
+        for ns in range(0, 41, 5):
+            if nf == 0 and ns == 0: continue
+            # 计算扩容后的指标
+            new_cap = cap_eff + CAP_F*nf + CAP_S*ns
+            new_peak = pk_d + (PW_F*nf + PW_S*ns)*SIM
+            # 成本
+            cost = CST_F*nf + CST_S*ns
+            # 供需缺口惩罚
+            gap = max(0, trips - new_cap)
+            # 电网风险惩罚
+            risk = max(0, new_peak - OVL)
+            # 覆盖提升
+            cov_gain = (scov_i*(nf+ns)/area_i) if area_i>0 else 0
+            cov_penalty = max(0, COV_MIN - (cov_i + cov_gain)) * 1000
+            # 总目标
+            total = cost + 0.5*gap + 0.3*risk + cov_penalty
+            if total < best_action[2]:
+                best_action = (nf, ns, total)
+    return best_action[0], best_action[1]
 
+for sc, r in SCENARIOS.items():
+    cum_f = BF.copy().astype(float); cum_s = BS.copy().astype(float)
     for t, yr in enumerate(YEARS):
         m = (1+r)**t
-
-        # ---- 3a. 计算各区域原始容量与有效容量 ----
-        cap_raw  = CAP_F*(EF + cum_f) + CAP_S*(ES + cum_s)
-        cap_eff  = cap_raw / max(1 - ETA_Q3 * ALPHA_DISPATCH, 0.01)
+        cap_raw = CAP_F*(EF + cum_f) + CAP_S*(ES + cum_s)
+        cap_eff = cap_raw / max(1 - ETA_Q3 * ALPHA_DISPATCH, 0.01)
         cap_boost = (cap_eff - cap_raw) / np.maximum(cap_raw, 1) * 100
-
-        # ---- 3b. 四维健康度指标 ----
         trips = D0*m / AVG_CHG
         s1 = np.minimum(cap_eff / np.maximum(trips, 1), 1.0)
         s2 = COV.copy()
@@ -167,93 +198,50 @@ for sc, r in SCENARIOS.items():
         s3a = 1.0 - np.minimum(pk_d/GRID, 1.0)
         s3b = np.where(pk_d<=OVL, 1.0, np.maximum(0, 1.0-(pk_d-OVL)/OVL))
         s3 = np.minimum(s3a, s3b)
-        # S4: 区域成本效率（Q2投资效率的倒数归一化）
-        invest_i = CST_F*cum_f + CST_S*cum_s  # 各区域累计投资
+        invest_i = CST_F*cum_f + CST_S*cum_s
         s4 = 1.0 - invest_i / max(invest_i.max(), 1)
-
-        # 熵权法确定权重
-        mat = np.column_stack([s1, s2, s3, s4])
-        w_ent = entropy_weights(mat)
-
+        mat = np.column_stack([s1, s2, s3, s4]); w_ent = entropy_weights(mat)
         H = w_ent[0]*s1 + w_ent[1]*s2 + w_ent[2]*s3 + w_ent[3]*s4
-        rho = trips / np.maximum(cap_eff, 1)
-        ov = (pk_d > OVL).astype(int)
+        rho = trips / np.maximum(cap_eff, 1); ov = (pk_d > OVL).astype(int)
 
-        # 记录有效容量
         for i in range(N):
+            pf = round(pk_d[i],1) if pk_d[i] <= OVL else OVL + 1
             all_op_cap.append({'情景':sc,'年份':yr,'区域':i+1,'区域名称':REGION_NAMES[i],
                 '原始容量':round(cap_raw[i],0),'有效容量':round(cap_eff[i],0),
-                '容量提升%':round(cap_boost[i],2),'调度效率η':ETA_Q3,
-                '转化系数α':ALPHA_DISPATCH})
-
-        # 记录健康度
+                '容量提升%':round(cap_boost[i],2),'调度效率η':ETA_Q3,'转化系数α':ALPHA_DISPATCH})
         for i in range(N):
             all_health.append({'情景':sc,'年份':yr,'区域':i+1,'区域名称':REGION_NAMES[i],
-                'S1_需求满足':round(s1[i],4),'S2_覆盖':round(s2[i],4),
-                'S3_安全':round(s3[i],4),'S4_经济':round(s4[i],4),
-                'w1':round(w_ent[0],4),'w2':round(w_ent[1],4),
-                'w3':round(w_ent[2],4),'w4':round(w_ent[3],4),
-                '健康度_H':round(H[i],4),'服务压力':round(rho[i],4),
-                '过载风险':ov[i],'峰调后_kW':round(pk_d[i],1),
+                'S1_需求满足':round(s1[i],4),'S2_覆盖':round(s2[i],4),'S3_安全':round(s3[i],4),
+                'S4_经济':round(s4[i],4),'w1':round(w_ent[0],4),'w2':round(w_ent[1],4),
+                'w3':round(w_ent[2],4),'w4':round(w_ent[3],4),'健康度_H':round(H[i],4),
+                '服务压力':round(rho[i],4),'过载风险':ov[i],'峰调后_kW':round(pk_d[i],1),
                 '有效容量':round(cap_eff[i],0)})
-
-        # ---- 3c. 扩容优先级（每年计算） ----
         for i in range(N):
-            G_i = (D0[i]*(1+r)**2 - D0[i]) / D0[i]  # 2026→2028区域需求增长率
+            G_i = (D0[i]*(1+r)**2 - D0[i]) / D0[i]
             P_i = 0.5*(1-H[i]) + 0.3*rho[i] + 0.2*(G_i/0.40)
             all_priority.append({'情景':sc,'年份':yr,'区域':i+1,'区域名称':REGION_NAMES[i],
-                '健康度':round(H[i],4),'饱和度':round(rho[i],4),
-                '需求增速':f'{G_i*100:.1f}%','优先级评分':round(P_i,4)})
+                '健康度':round(H[i],4),'饱和度':round(rho[i],4),'需求增速':f'{G_i*100:.1f}%',
+                '优先级评分':round(P_i,4)})
 
-        # ---- 3d. 扩容触发与容量更新 ----
+        # DP扩容决策
         yr_exp = []
         for i in range(N):
             need = (H[i] < TH_H) or (rho[i] > TH_RHO) or (ov[i] == 1)
-            if not need:
-                continue
-
-            ogap = max(0, pk_d[i] - OVL)
-            cgap = max(0, COV_MIN - COV[i])
-            # 需求缺口：预测车次超过有效容量的差额
-            dgap = max(0, trips[i] - cap_eff[i])
-
-            nf = 0; ns = 0
-            # 过载驱动→快充分流
-            if ogap > 0:
-                nf = min(int(np.ceil(ogap/(PW_F*SIM))), 5)
-            # 需求缺口驱动→按快慢配比补充
-            if dgap > 0:
-                nf = max(nf, int(np.ceil(dgap * 0.3 / CAP_F)))
-                ns = max(ns, int(np.ceil(dgap * 0.7 / CAP_S)))
-            # 覆盖缺口驱动→慢充补
-            if cgap > 0.01:
-                marg = SCOV[i]*((1.0-COV[i])**1.2)
-                ns = max(ns, int(np.ceil(cgap*AREA[i]/marg)) - int(cum_f[i]) - int(cum_s[i]))
-
-            cum_f[i] += nf
-            cum_s[i] += ns
-
-            triggers = []
-            if ogap > 0: triggers.append('过载分流')
-            if dgap > 0: triggers.append('需求缺口')
-            if cgap > 0.01: triggers.append('覆盖补缺')
-            if not triggers: triggers.append('健康度不足')
-            reason = '+'.join(triggers)
-            if nf == 0 and ns == 0:
-                continue  # 触发但无实际缺口（调度已解决），跳过
+            if not need: continue
+            nf, ns = dp_expand(H[i], rho[i], ov[i], trips[i], cap_eff[i],
+                              pk_d[i], COV[i], AREA[i], SCOV[i], cum_f[i], cum_s[i])
+            if nf == 0 and ns == 0: continue
+            cum_f[i] += nf; cum_s[i] += ns
             yr_exp.append({'情景':sc,'年份':yr,'区域':i+1,'区域名称':REGION_NAMES[i],
                 '健康度':round(H[i],4),'服务压力':round(rho[i],4),
                 '新增快充':nf,'新增慢充':ns,'成本_万':CST_F*nf+CST_S*ns,
-                '触发原因':reason})
+                '触发原因':'DP优化'})
             all_exp.append(yr_exp[-1])
-
         if yr_exp:
             df_tmp = pd.DataFrame(yr_exp)
             print(f'  {sc} {yr}年: 扩容{len(yr_exp)}区域, '
                   f'{df_tmp["新增快充"].sum()}快+{df_tmp["新增慢充"].sum()}慢, '
                   f'{df_tmp["成本_万"].sum():.1f}万')
-
-    # 情景汇总
     last_yr = 2028
     mh = [h for h in all_health if h['情景']==sc and h['年份']==last_yr]
     me = [e for e in all_exp if e['情景']==sc]
@@ -263,8 +251,7 @@ for sc, r in SCENARIOS.items():
     dem_2028 = df_dem[(df_dem['情景']==sc)&(df_dem['年份']==2028)]['日均需求_kWh'].sum()/1000
     final_summary.append({'情景':sc,'增长率':f'{r*100:.0f}%',
         '2028需求_MWh':round(dem_2028,1),'2028平均健康度':round(avg_H,4),
-        '扩容总次数':len(me),'扩容总成本_万':round(total_cost,1),
-        '2028过载区域数':ov_cnt})
+        '扩容总次数':len(me),'扩容总成本_万':round(total_cost,1),'2028过载区域数':ov_cnt})
 
 # 保存所有数据
 df_health = pd.DataFrame(all_health)

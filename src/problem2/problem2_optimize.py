@@ -43,6 +43,8 @@ dist_matrix = data['dist_matrix']
 service_radii = data['service_radii']
 
 df_gap = pd.read_excel(FILE_Q2_TABLE1)
+# 重要：按区域编号排序，确保数组索引与区域编号一致
+df_gap = df_gap.sort_values('区域编号').reset_index(drop=True)
 
 # =============================================================================
 # 1. 全局参数
@@ -53,11 +55,12 @@ CAP_FAST = 80; CAP_SLOW = 20
 POWER_FAST = 120; POWER_SLOW = 7
 SIMULTANEITY = 0.8; AVG_CHARGE_PER_CAR = 12.0
 R_CORE = 1.5; R_NEW = 2.0; R_SUBURB = 2.5
-COVERAGE_MIN = 0.90
+COVERAGE_MIN = 0.80  # 最低覆盖率（从90%下调至80%，避免与过载约束冲突）
 ROBUST_DELTA = 1.0; RMSE = 208.52
 POP_SIZE = 100; N_GENERATIONS = 500
 P_CROSSOVER = 0.9; P_MUTATION = 0.1
 ETA_C = 20; ETA_M = 20; MAX_NEW_PER_REGION = 300
+OVERLOAD_KW = 2100  # 配电过载阈值(kW)，超过此值存在过载风险
 
 # 附件1：现有桩数
 existing_fast = np.array([129, 119, 99, 109, 76, 95, 45, 59, 39, 53])
@@ -159,52 +162,112 @@ def objective_coverage(delta_fast, delta_slow):
 
 
 def objective_balance(delta_fast, delta_slow):
+    """
+    负荷均衡目标：最小化各区域配电负载率方差 + 惩罚最大负载率。
+    """
     pop_size = delta_fast.shape[0]
     load_rates = np.zeros((pop_size, N_REGIONS))
     delta_load = SIMULTANEITY * (POWER_FAST * delta_fast + POWER_SLOW * delta_slow)
     for i in range(N_REGIONS):
-        load_rates[:, i] = (pred_peak_kw[i] + delta_load[:, i]) / grid_capacity_kw[i]
-    return np.var(load_rates, axis=1)
+        peak_after = pred_peak_kw[i] + delta_load[:, i]
+        load_rates[:, i] = peak_after / OVERLOAD_KW
+    variance = np.var(load_rates, axis=1)
+    max_rate = np.max(load_rates, axis=1)
+    return variance + 0.3 * max_rate
+
+
+def objective_grid_risk(delta_fast, delta_slow):
+    """
+    电网风险惩罚项（新增第4目标）：
+    Risk_grid = Σ max(0, PeakLoad_i / GridCapacity_i - 0.9)²
+    超过电网容量90%时施加平方惩罚，引导优化器远离电网过载边界。
+    """
+    pop_size = delta_fast.shape[0]
+    delta_load = SIMULTANEITY * (POWER_FAST * delta_fast + POWER_SLOW * delta_slow)
+    risk = np.zeros(pop_size)
+    for i in range(N_REGIONS):
+        peak_after = pred_peak_kw[i] + delta_load[:, i]
+        # 负载率 = 峰值负荷 / 电网总容量
+        load_ratio = peak_after / grid_capacity_kw[i]
+        # 超过90%时惩罚
+        excess = np.maximum(0, load_ratio - 0.90)
+        risk += excess ** 2
+    return risk
 
 
 def check_constraints(delta_fast, delta_slow):
+    """
+    约束条件检查:
+    1. 服务能力 >= 鲁棒需求（必须满足充电需求）
+    2. 配电过载约束 — 已超2100kW区域不得加重，其余区域新增后≤2100kW
+    注意: 覆盖率不作为硬约束（已是最大化目标），仅检查需求和过载两项硬约束
+    """
     pop_size = delta_fast.shape[0]
     feasible = np.ones(pop_size, dtype=bool)
-    cov_standalone = compute_coverage_standalone(delta_fast, delta_slow)
-    for i in range(N_REGIONS):
-        feasible = feasible & (cov_standalone[:, i] >= COVERAGE_MIN)
+
+    # 约束1: 服务能力达标（必须满足预测的充电需求）
     capacity = compute_service_capacity(delta_fast, delta_slow)
     trips_robust = pred_demand_trips + ROBUST_DELTA * RMSE / AVG_CHARGE_PER_CAR
     for i in range(N_REGIONS):
         feasible = feasible & (capacity[:, i] >= trips_robust[i])
+
+    # 约束2: 配电过载约束 — 防止优化导致电网过载恶化
     delta_load = SIMULTANEITY * (POWER_FAST * delta_fast + POWER_SLOW * delta_slow)
     for i in range(N_REGIONS):
-        feasible = feasible & (pred_peak_kw[i] + delta_load[:, i] <= grid_capacity_kw[i])
+        peak_after = pred_peak_kw[i] + delta_load[:, i]
+        already_over = pred_peak_kw[i] > OVERLOAD_KW
+        if already_over:
+            # 已超载区域：不得新增快充，慢充峰值增量≤30kW（仅作覆盖补充）
+            feasible = feasible & (delta_fast[:, i] == 0)
+            feasible = feasible & (delta_load[:, i] <= 30)
+        else:
+            # 未超载区域：新增后峰值不得超过2100kW
+            feasible = feasible & (peak_after <= OVERLOAD_KW)
+
     return feasible
 
 
 def evaluate_population(x):
     delta_fast, delta_slow = decode_variables(x)
-    obj1 = objective_cost(delta_fast, delta_slow)
-    obj2 = objective_coverage(delta_fast, delta_slow)
-    obj3 = objective_balance(delta_fast, delta_slow)
+    obj1 = objective_cost(delta_fast, delta_slow)          # f1: 成本
+    obj2 = objective_coverage(delta_fast, delta_slow)       # f2: 覆盖率
+    obj3 = objective_balance(delta_fast, delta_slow)        # f3: 负荷均衡
+    obj4 = objective_grid_risk(delta_fast, delta_slow)      # f4: 电网风险(新增)
     feasible = check_constraints(delta_fast, delta_slow)
-    return obj1, obj2, obj3, feasible
+    return obj1, obj2, obj3, obj4, feasible
 
 
 def initialize_population():
+    """
+    初始化种群：基于建设紧迫度分配充电桩，同时考虑过载约束。
+    已超载区域不加快充；未超载区域按剩余容量限制快充数量。
+    """
     pop = np.zeros((POP_SIZE, N_VARS))
     urgency = df_gap.sort_values('区域编号')['建设紧迫度指数(0-100)'].values
     urgency_norm = urgency / urgency.max()
+
     for i in range(N_REGIONS):
-        base_fast = int(urgency_norm[i] * 40)
-        base_slow = int(urgency_norm[i] * 80)
-        pop[:, 2*i] = np.random.randint(0, max(base_fast + 10, 20), POP_SIZE)
-        pop[:, 2*i+1] = np.random.randint(0, max(base_slow + 10, 40), POP_SIZE)
+        already_over = pred_peak_kw[i] > OVERLOAD_KW
+        peak_remaining = max(0, OVERLOAD_KW - pred_peak_kw[i])
+
+        if already_over:
+            # 已超载区域：不加快充，仅少量慢充
+            base_fast = 0
+            base_slow = int(urgency_norm[i] * 10)  # 最多10个慢充
+        else:
+            # 未超载区域：快充数量受剩余峰值容量限制
+            max_fast_by_peak = int(peak_remaining / (POWER_FAST * SIMULTANEITY))
+            base_fast = min(int(urgency_norm[i] * 15), max_fast_by_peak)
+            base_slow = int(urgency_norm[i] * 20)
+
+        pop[:, 2*i] = np.random.randint(0, max(base_fast + 3, 5), POP_SIZE)
+        pop[:, 2*i+1] = np.random.randint(0, max(base_slow + 3, 8), POP_SIZE)
+
     return pop
 
 
-def non_dominated_sort(obj1, obj2, obj3, feasible):
+def non_dominated_sort(obj1, obj2, obj3, obj4, feasible):
+    """4目标非支配排序"""
     pop_size = len(obj1)
     dominated_count = np.zeros(pop_size, dtype=int)
     dominates_list = [[] for _ in range(pop_size)]
@@ -215,10 +278,15 @@ def non_dominated_sort(obj1, obj2, obj3, feasible):
             elif not feasible[p] and feasible[q]:
                 dominated_count[p] += 1; dominates_list[q].append(p)
             elif feasible[p] and feasible[q]:
-                p_better = (obj1[p] <= obj1[q] and obj2[p] >= obj2[q] and obj3[p] <= obj3[q])
-                p_strict = (obj1[p] < obj1[q] or obj2[p] > obj2[q] or obj3[p] < obj3[q])
-                q_better = (obj1[q] <= obj1[p] and obj2[q] >= obj2[p] and obj3[q] <= obj3[p])
-                q_strict = (obj1[q] < obj1[p] or obj2[q] > obj2[p] or obj3[q] < obj3[p])
+                # 4目标: 全部≤且至少一个<
+                p_better = (obj1[p] <= obj1[q] and obj2[p] >= obj2[q] and
+                           obj3[p] <= obj3[q] and obj4[p] <= obj4[q])
+                p_strict = (obj1[p] < obj1[q] or obj2[p] > obj2[q] or
+                           obj3[p] < obj3[q] or obj4[p] < obj4[q])
+                q_better = (obj1[q] <= obj1[p] and obj2[q] >= obj2[p] and
+                           obj3[q] <= obj3[p] and obj4[q] <= obj4[p])
+                q_strict = (obj1[q] < obj1[p] or obj2[q] > obj2[p] or
+                           obj3[q] < obj3[p] or obj4[q] < obj4[p])
                 if p_better and p_strict:
                     dominates_list[p].append(q); dominated_count[q] += 1
                 elif q_better and q_strict:
@@ -237,13 +305,15 @@ def non_dominated_sort(obj1, obj2, obj3, feasible):
     return fronts
 
 
-def crowding_distance(obj1, obj2, obj3, front_indices):
+def crowding_distance(obj1, obj2, obj3, obj4, front_indices):
+    """4目标拥挤距离"""
     n = len(front_indices)
     if n <= 2:
         return np.full(n, np.inf)
     distance = np.zeros(n)
-    for obj in [obj1, obj2, obj3]:
-        values = -obj[front_indices] if obj is obj2 else obj[front_indices]
+    # f1(cost↓), f2(cov↑), f3(balance↓), f4(risk↓)
+    for obj, maximize in [(obj1, False), (obj2, True), (obj3, False), (obj4, False)]:
+        values = -obj[front_indices] if maximize else obj[front_indices]
         sorted_idx = np.argsort(values)
         values_sorted = values[sorted_idx]
         distance[sorted_idx[0]] = np.inf; distance[sorted_idx[-1]] = np.inf
@@ -303,18 +373,18 @@ print('=' * 60)
 
 np.random.seed(42)
 pop = initialize_population()
-obj1, obj2, obj3, feasible = evaluate_population(pop)
+obj1, obj2, obj3, obj4, feasible = evaluate_population(pop)
 
 convergence_history = {
     'generation': [], 'min_cost': [], 'max_coverage': [],
-    'min_variance': [], 'n_feasible': [], 'n_pareto_front1': [],
+    'min_variance': [], 'min_grid_risk': [], 'n_feasible': [], 'n_pareto_front1': [],
 }
 
 for gen in range(N_GENERATIONS):
-    fronts = non_dominated_sort(obj1, obj2, obj3, feasible)
+    fronts = non_dominated_sort(obj1, obj2, obj3, obj4, feasible)
     crowding = np.zeros(POP_SIZE)
     for front in fronts:
-        crowding[front] = crowding_distance(obj1, obj2, obj3, front)
+        crowding[front] = crowding_distance(obj1, obj2, obj3, obj4, front)
 
     feasible_idx = np.where(feasible)[0]
     conv = convergence_history
@@ -323,16 +393,19 @@ for gen in range(N_GENERATIONS):
         conv['min_cost'].append(np.min(obj1[feasible_idx]))
         conv['max_coverage'].append(np.max(obj2[feasible_idx]))
         conv['min_variance'].append(np.min(obj3[feasible_idx]))
+        conv['min_grid_risk'].append(np.min(obj4[feasible_idx]))
     else:
-        conv['min_cost'].append(np.inf); conv['max_coverage'].append(0); conv['min_variance'].append(np.inf)
+        conv['min_cost'].append(np.inf); conv['max_coverage'].append(0)
+        conv['min_variance'].append(np.inf); conv['min_grid_risk'].append(np.inf)
     conv['n_feasible'].append(np.sum(feasible))
     conv['n_pareto_front1'].append(len(fronts[0]) if fronts else 0)
 
     if gen % 50 == 0:
         fc = np.sum(feasible); mc = conv['min_cost'][-1]; cv = conv['max_coverage'][-1]
+        gr = conv['min_grid_risk'][-1]
         print(f'Gen {gen:3d} | 可行:{fc:3d} | F1:{len(fronts[0]):2d} | '
               f'MinCost:{"inf" if np.isinf(mc) else f"{mc:.0f}万":>8s} | '
-              f'MaxCov:{cv:.4f} | MinVar:{conv["min_variance"][-1]:.6f}')
+              f'MaxCov:{cv:.4f} | MinRisk:{"inf" if np.isinf(gr) else f"{gr:.6f}":>10s}')
 
     selected = binary_tournament_selection(pop, obj1, obj2, obj3, feasible, fronts, crowding)
     offspring = np.zeros_like(selected)
@@ -341,33 +414,36 @@ for gen in range(N_GENERATIONS):
         offspring[i] = polynomial_mutation(c1)
         if i + 1 < POP_SIZE:
             offspring[i+1] = polynomial_mutation(c2)
-    o1, o2, o3, of = evaluate_population(offspring)
+    o1, o2, o3, o4, of = evaluate_population(offspring)
     cp = np.vstack([pop, offspring])
-    co1 = np.hstack([obj1, o1]); co2 = np.hstack([obj2, o2]); co3 = np.hstack([obj3, o3])
+    co1 = np.hstack([obj1, o1]); co2 = np.hstack([obj2, o2])
+    co3 = np.hstack([obj3, o3]); co4 = np.hstack([obj4, o4])
     cof = np.hstack([feasible, of])
-    cfronts = non_dominated_sort(co1, co2, co3, cof)
+    cfronts = non_dominated_sort(co1, co2, co3, co4, cof)
     ccrowd = np.zeros(2*POP_SIZE)
     for fr in cfronts:
-        ccrowd[fr] = crowding_distance(co1, co2, co3, fr)
+        ccrowd[fr] = crowding_distance(co1, co2, co3, co4, fr)
 
     new_pop = np.zeros((POP_SIZE, N_VARS))
-    no1 = np.zeros(POP_SIZE); no2 = np.zeros(POP_SIZE); no3 = np.zeros(POP_SIZE)
+    no1 = np.zeros(POP_SIZE); no2 = np.zeros(POP_SIZE)
+    no3 = np.zeros(POP_SIZE); no4 = np.zeros(POP_SIZE)
     nof = np.zeros(POP_SIZE, dtype=bool)
     cnt = 0
     for fr in cfronts:
         if cnt + len(fr) <= POP_SIZE:
             for idx in fr:
                 new_pop[cnt] = cp[idx]; no1[cnt] = co1[idx]; no2[cnt] = co2[idx]
-                no3[cnt] = co3[idx]; nof[cnt] = cof[idx]; cnt += 1
+                no3[cnt] = co3[idx]; no4[cnt] = co4[idx]; nof[cnt] = cof[idx]; cnt += 1
         else:
             rem = POP_SIZE - cnt
             fcrd = ccrowd[fr]
             for idx in np.argsort(fcrd)[::-1][:rem]:
                 new_pop[cnt] = cp[fr[idx]]; no1[cnt] = co1[fr[idx]]
-                no2[cnt] = co2[fr[idx]]; no3[cnt] = co3[fr[idx]]; nof[cnt] = cof[fr[idx]]
+                no2[cnt] = co2[fr[idx]]; no3[cnt] = co3[fr[idx]]
+                no4[cnt] = co4[fr[idx]]; nof[cnt] = cof[fr[idx]]
                 cnt += 1
             break
-    pop, obj1, obj2, obj3, feasible = new_pop, no1, no2, no3, nof
+    pop, obj1, obj2, obj3, obj4, feasible = new_pop, no1, no2, no3, no4, nof
 
 print(f'\nNSGA-II完成！可行解: {np.sum(feasible)}, F1规模: {convergence_history["n_pareto_front1"][-1]}')
 
@@ -375,7 +451,7 @@ print(f'\nNSGA-II完成！可行解: {np.sum(feasible)}, F1规模: {convergence_
 # 提取Pareto前沿
 # =============================================================================
 print('\n提取Pareto前沿...')
-final_fronts = non_dominated_sort(obj1, obj2, obj3, feasible)
+final_fronts = non_dominated_sort(obj1, obj2, obj3, obj4, feasible)
 pareto_indices = [i for i in final_fronts[0] if feasible[i]]
 
 if len(pareto_indices) < 5:
@@ -386,12 +462,14 @@ if len(pareto_indices) < 5:
 print(f'Pareto解数量: {len(pareto_indices)}')
 
 pareto_pop = pop[pareto_indices]
-pareto_obj1 = obj1[pareto_indices]; pareto_obj2 = obj2[pareto_indices]; pareto_obj3 = obj3[pareto_indices]
+pareto_obj1 = obj1[pareto_indices]; pareto_obj2 = obj2[pareto_indices]
+pareto_obj3 = obj3[pareto_indices]; pareto_obj4 = obj4[pareto_indices]
 pareto_fast, pareto_slow = decode_variables(pareto_pop)
 
 print(f'成本范围: {pareto_obj1.min():.0f} ~ {pareto_obj1.max():.0f} 万元')
 print(f'覆盖率范围: {pareto_obj2.min():.4f} ~ {pareto_obj2.max():.4f}')
 print(f'方差范围: {pareto_obj3.min():.6f} ~ {pareto_obj3.max():.6f}')
+print(f'电网风险范围: {pareto_obj4.min():.6f} ~ {pareto_obj4.max():.6f}')
 
 # =============================================================================
 # 保存结果
@@ -399,7 +477,8 @@ print(f'方差范围: {pareto_obj3.min():.6f} ~ {pareto_obj3.max():.6f}')
 pareto_records = []
 for k in range(len(pareto_indices)):
     rec = {'解编号': k+1, '总成本_万元': pareto_obj1[k],
-           '平均覆盖率': pareto_obj2[k], '负荷率方差': pareto_obj3[k]}
+           '平均覆盖率': pareto_obj2[k], '负荷率方差': pareto_obj3[k],
+           '电网风险指数': pareto_obj4[k]}
     for i in range(N_REGIONS):
         rec[f'区域{i+1}_新增快充'] = int(pareto_fast[k, i])
         rec[f'区域{i+1}_新增慢充'] = int(pareto_slow[k, i])
@@ -410,7 +489,7 @@ pd.DataFrame(convergence_history).to_excel(FILE_Q2_CONVERGENCE, index=False)
 
 np.savez(FILE_Q2_OPTIMIZATION,
          pareto_pop=pareto_pop, pareto_obj1=pareto_obj1,
-         pareto_obj2=pareto_obj2, pareto_obj3=pareto_obj3,
+         pareto_obj2=pareto_obj2, pareto_obj3=pareto_obj3, pareto_obj4=pareto_obj4,
          pareto_fast=pareto_fast, pareto_slow=pareto_slow,
          convergence_history=convergence_history)
 
